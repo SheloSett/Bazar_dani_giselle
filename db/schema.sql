@@ -33,3 +33,9 @@ CREATE TABLE IF NOT EXISTS settings (
 
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_photos_product    ON product_photos(product_id);
+
+-- Columnas agregadas después del esquema inicial (también idempotentes)
+-- Precio anterior cuando el producto está en oferta (se muestra tachado); NULL si no
+ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_price INTEGER;
+-- Unidades disponibles; NULL = no se controla el stock (siempre disponible)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER;

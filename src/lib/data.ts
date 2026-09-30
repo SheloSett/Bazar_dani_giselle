@@ -13,6 +13,10 @@ export interface PublicProduct {
   name: string;
   description: string;
   price: number;
+  // Precio anterior si está en oferta (se muestra tachado); null si no
+  compare_price: number | null;
+  // Unidades disponibles; null = no se controla el stock
+  stock: number | null;
   category: string | null;
   photos: string[];
 }
@@ -111,20 +115,23 @@ const PHOTO_AGG = `
   ) AS photos
 `;
 
+const PRODUCT_COLS = 'p.id, p.name, p.description, p.price, p.compare_price, p.stock';
+
 export async function listPublicProducts(): Promise<PublicProduct[]> {
+  // Los productos sin stock van al final de su categoría
   return query<PublicProduct>(
-    `SELECT p.id, p.name, p.description, p.price, c.name AS category, ${PHOTO_AGG}
+    `SELECT ${PRODUCT_COLS}, c.name AS category, ${PHOTO_AGG}
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
      WHERE p.visible
-     ORDER BY c.position NULLS LAST, p.position, p.id`
+     ORDER BY c.position NULLS LAST, (COALESCE(p.stock, 1) = 0), p.position, p.id`
   );
 }
 
 export async function listAdminProducts(): Promise<AdminProduct[]> {
   return query<AdminProduct>(
-    `SELECT p.id, p.name, p.description, p.price, p.category_id, p.visible,
-            p.position, c.name AS category, ${PHOTO_AGG}
+    `SELECT ${PRODUCT_COLS}, p.category_id, p.visible, p.position,
+            c.name AS category, ${PHOTO_AGG}
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
      ORDER BY c.position NULLS LAST, p.position, p.id`
@@ -133,8 +140,8 @@ export async function listAdminProducts(): Promise<AdminProduct[]> {
 
 export async function getAdminProduct(id: number): Promise<AdminProduct | null> {
   const rows = await query<AdminProduct>(
-    `SELECT p.id, p.name, p.description, p.price, p.category_id, p.visible,
-            p.position, c.name AS category, ${PHOTO_AGG}
+    `SELECT ${PRODUCT_COLS}, p.category_id, p.visible, p.position,
+            c.name AS category, ${PHOTO_AGG}
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
      WHERE p.id = $1`,
@@ -155,17 +162,27 @@ export interface ProductInput {
   name: string;
   description: string;
   price: number;
+  compare_price: number | null;
+  stock: number | null;
   category_id: number | null;
   visible: boolean;
 }
 
 export async function createProduct(input: ProductInput): Promise<{ id: number }> {
   const rows = await query<{ id: number }>(
-    `INSERT INTO products (name, description, price, category_id, visible, position)
-     VALUES ($1, $2, $3, $4, $5,
+    `INSERT INTO products (name, description, price, compare_price, stock, category_id, visible, position)
+     VALUES ($1, $2, $3, $4, $5, $6, $7,
              COALESCE((SELECT MAX(position) + 1 FROM products), 1))
      RETURNING id`,
-    [input.name, input.description, input.price, input.category_id, input.visible]
+    [
+      input.name,
+      input.description,
+      input.price,
+      input.compare_price,
+      input.stock,
+      input.category_id,
+      input.visible,
+    ]
   );
   return rows[0];
 }
@@ -183,6 +200,8 @@ export async function updateProduct(
   if (input.name !== undefined) add('name', input.name);
   if (input.description !== undefined) add('description', input.description);
   if (input.price !== undefined) add('price', input.price);
+  if (input.compare_price !== undefined) add('compare_price', input.compare_price);
+  if (input.stock !== undefined) add('stock', input.stock);
   if (input.category_id !== undefined) add('category_id', input.category_id);
   if (input.visible !== undefined) add('visible', input.visible);
   if (!sets.length) return;
@@ -218,6 +237,22 @@ export async function addPhoto(
     [productId, filename]
   );
   return rows[0];
+}
+
+// Nuevo orden de las fotos de un producto (la primera es la portada).
+// Devuelve false si los ids no son exactamente las fotos de ese producto.
+export async function reorderPhotos(productId: number, ids: number[]): Promise<boolean> {
+  const current = (await listProductPhotos(productId)).map((p) => p.id).sort((a, b) => a - b);
+  const given = [...ids].sort((a, b) => a - b);
+  if (current.length !== given.length || current.some((id, i) => id !== given[i])) return false;
+  // Una sola sentencia: o cambia todo el orden o no cambia nada
+  await query(
+    `UPDATE product_photos ph SET position = v.pos
+     FROM unnest($1::int[], $2::int[]) AS v(id, pos)
+     WHERE ph.id = v.id AND ph.product_id = $3`,
+    [ids, ids.map((_, i) => i + 1), productId]
+  );
+  return true;
 }
 
 export async function deletePhoto(id: number): Promise<string | null> {

@@ -21,15 +21,22 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
 # Server standalone de Next + assets estáticos
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
 # Migraciones (se corren al arrancar el contenedor)
 COPY --from=build /app/db ./db
 COPY --from=build /app/scripts ./scripts
 
-RUN mkdir -p /app/uploads
+# sharp carga su binario nativo (@img/sharp-<plataforma>) de forma dinámica y
+# el trazado del build standalone no lo incluye: se copia aparte
+COPY --from=deps /app/node_modules/sharp ./node_modules/sharp
+COPY --from=deps /app/node_modules/@img ./node_modules/@img
+
+# Corre con el usuario sin privilegios "node" de la imagen, no como root
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+USER node
 
 EXPOSE 3000
 CMD ["sh", "-c", "node scripts/migrate.mjs && node server.js"]

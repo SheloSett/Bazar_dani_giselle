@@ -1,4 +1,4 @@
-// Aplica db/schema.sql y, si la base está vacía, db/seed.sql.
+// Aplica db/schema.sql y, si la base es nueva, db/seed.sql.
 // Se corre al arrancar el contenedor y también a mano con: npm run db:init
 
 import { readFileSync } from 'node:fs';
@@ -33,12 +33,20 @@ try {
   console.log('[migrate] aplicando schema.sql');
   await client.query(sql('schema.sql'));
 
-  const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM products');
-  if (rows[0].n === 0) {
-    console.log('[migrate] base vacía: cargando seed.sql');
+  // Base nueva = sin productos, categorías ni ajustes. Mirar solo productos no
+  // alcanza: si el admin borra todos, al reiniciar volverían los de ejemplo.
+  // Los ajustes no se pueden borrar desde el panel, así que marcan que ya se usó.
+  const { rows } = await client.query(
+    `SELECT (SELECT COUNT(*) FROM products)::int   AS products,
+            (SELECT COUNT(*) FROM categories)::int AS categories,
+            (SELECT COUNT(*) FROM settings)::int   AS settings`
+  );
+  const n = rows[0];
+  if (n.products + n.categories + n.settings === 0) {
+    console.log('[migrate] base nueva: cargando seed.sql');
     await client.query(sql('seed.sql'));
   } else {
-    console.log(`[migrate] base con ${rows[0].n} productos: no se carga el seed`);
+    console.log(`[migrate] base en uso (${n.products} productos): no se carga el seed`);
   }
   console.log('[migrate] listo');
 } finally {

@@ -13,6 +13,11 @@ export const pool =
 
 if (process.env.NODE_ENV !== 'production') globalForPg.pgPool = pool;
 
+// Error de Postgres por clave foránea inexistente (ej: category_id que no existe)
+export function isForeignKeyViolation(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === '23503';
+}
+
 export async function query<T = unknown>(
   text: string,
   params: unknown[] = []

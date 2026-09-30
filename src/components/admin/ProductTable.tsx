@@ -4,9 +4,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { AdminProduct } from '@/lib/data';
+import { LOW_STOCK, money, thumbUrl } from '@/lib/catalog';
 import { IconPhoto } from '@/components/icons';
 
-const money = (n: number) => '$ ' + n.toLocaleString('es-AR');
+function StockCell({ stock }: { stock: number | null }) {
+  if (stock === null) return <span title="Sin control de stock">—</span>;
+  if (stock === 0) return <span className="pill out">Sin stock</span>;
+  if (stock <= LOW_STOCK) return <span className="pill low">{stock}</span>;
+  return <>{stock}</>;
+}
 
 export function ProductTable({ initial }: { initial: AdminProduct[] }) {
   const router = useRouter();
@@ -54,6 +60,7 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
             <th>Nombre</th>
             <th>Categoría</th>
             <th>Precio</th>
+            <th>Stock</th>
             <th>Estado</th>
             <th></th>
           </tr>
@@ -61,7 +68,7 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
         <tbody>
           {products.length === 0 && (
             <tr>
-              <td colSpan={6} className="empty">
+              <td colSpan={7} className="empty">
                 Todavía no hay productos. Creá el primero con “Nuevo producto”.
               </td>
             </tr>
@@ -71,7 +78,7 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
               <td>
                 {p.photos[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="thumb" src={`/uploads/${p.photos[0]}`} alt="" />
+                  <img className="thumb" src={thumbUrl(p.photos[0])} alt="" />
                 ) : (
                   <span className="thumb-empty">
                     <IconPhoto className="ic" />
@@ -80,7 +87,17 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
               </td>
               <td>{p.name}</td>
               <td>{p.category ?? '—'}</td>
-              <td className="price-cell">{money(p.price)}</td>
+              <td className="price-cell">
+                {p.compare_price !== null && p.compare_price > p.price && (
+                  <>
+                    <s>{money(p.compare_price)}</s>{' '}
+                  </>
+                )}
+                {money(p.price)}
+              </td>
+              <td>
+                <StockCell stock={p.stock} />
+              </td>
               <td>
                 <button
                   className={p.visible ? 'pill on' : 'pill'}

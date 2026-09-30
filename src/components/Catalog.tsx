@@ -3,10 +3,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicProduct, Settings } from '@/lib/data';
 import {
+  discountPercent,
+  isOutOfStock,
+  matchesSearch,
+  maxQuantity,
+  money,
+  photoUrl,
+  stockLabel,
+  thumbUrl,
+} from '@/lib/catalog';
+import { ProductCard } from '@/components/ProductCard';
+import { Gallery } from '@/components/Gallery';
+import { Hero, Perks } from '@/components/Hero';
+import { CategoryTiles } from '@/components/CategoryTiles';
+import { SiteFooter, WhatsAppFab } from '@/components/SiteFooter';
+import {
   IconBasket,
   IconClose,
   IconMinus,
-  IconPhoto,
   IconPlus,
   IconSearch,
   IconWhatsApp,
@@ -15,8 +29,6 @@ import {
 const CART_KEY = 'catalogo-cart';
 
 type Cart = Record<number, number>; // product id -> cantidad
-
-const money = (n: number) => '$ ' + n.toLocaleString('es-AR');
 
 function loadCart(): Cart {
   try {
@@ -62,19 +74,51 @@ export function Catalog({
     persistCart(next);
   };
 
+  const stockOf = (id: number) => products.find((x) => x.id === id)?.stock ?? null;
+
   const tabs = useMemo(
     () => ['Todo', ...categories.filter((c) => products.some((p) => p.category === c))],
     [categories, products]
   );
 
-  const list = useMemo(() => {
-    const t = search.trim().toLowerCase();
-    return products.filter(
-      (p) =>
-        (category === 'Todo' || p.category === category) &&
-        (!t || (p.name + ' ' + p.description).toLowerCase().includes(t))
-    );
-  }, [products, category, search]);
+  // Tapa de cada rubro: la foto del primer producto que tenga
+  const tiles = useMemo(
+    () =>
+      tabs.slice(1).map((c) => {
+        const inCat = products.filter((p) => p.category === c);
+        const cover = inCat.find((p) => p.photos.length > 0);
+        return { name: c, count: inCat.length, photo: cover ? thumbUrl(cover.photos[0]) : null };
+      }),
+    [tabs, products]
+  );
+
+  // Collage de la portada: hasta 3 fotos, una por rubro y distintas de las tapas
+  // de los rubros (si no alcanzan, se repiten)
+  const heroPhotos = useMemo(() => {
+    const covers = new Set(tiles.map((t) => t.photo));
+    const withPhoto = products.filter((p) => p.photos.length > 0);
+    const fresh = withPhoto.filter((p) => !covers.has(thumbUrl(p.photos[0])));
+    const picked: PublicProduct[] = [];
+    for (const t of tiles) {
+      const p = fresh.find((x) => x.category === t.name);
+      if (p) picked.push(p);
+    }
+    for (const p of [...fresh, ...withPhoto]) if (!picked.includes(p)) picked.push(p);
+    // La primera se ve grande: va la foto completa; las otras, la miniatura
+    return picked.slice(0, 3).map((p, i) => (i === 0 ? photoUrl : thumbUrl)(p.photos[0]));
+  }, [tiles, products]);
+
+  const stats =
+    `${products.length} ${products.length === 1 ? 'producto' : 'productos'}` +
+    (tiles.length > 1 ? ` · ${tiles.length} rubros` : '');
+
+  const list = useMemo(
+    () =>
+      products.filter(
+        (p) => (category === 'Todo' || p.category === category) && matchesSearch(p, search)
+      ),
+    [products, category, search]
+  );
 
   const items = useMemo(
     () =>
@@ -88,13 +132,35 @@ export function Catalog({
 
   const orderMessage = () => {
     const lines = items
-      .map((x) => `- ${x.n} x ${x.p.name} — ${money(x.p.price)} c/u`)
+      .map(
+        (x) =>
+          `- ${x.n} x ${x.p.name} — ${money(x.p.price)} c/u` +
+          (isOutOfStock(x.p.stock) ? ' (sin stock, a confirmar)' : '')
+      )
       .join('\n');
     return `Hola, les paso mi pedido desde el catálogo:\n${lines}\nTotal estimado: ${money(total)}\n¿Me confirman cotización y entrega?`;
   };
 
   const waLink = (text: string) =>
     `https://wa.me/${settings.whatsapp_phone}?text=${encodeURIComponent(text)}`;
+
+  // Consulta general (portada, pie y botón flotante): solo si hay número cargado
+  const waGeneral = settings.whatsapp_phone
+    ? waLink('Hola, quería hacer una consulta.')
+    : null;
+
+  // Baja hasta la grilla de productos
+  const browse = () => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document
+      .getElementById('productos')
+      ?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  };
+
+  const pickCategory = (c: string) => {
+    setCategory(c);
+    browse();
+  };
 
   const showToast = (text: string) => {
     setToast(text);
@@ -109,16 +175,32 @@ export function Catalog({
 
   const addToCart = () => {
     if (!current) return;
-    updateCart({ ...cart, [current.id]: (cart[current.id] || 0) + qty });
-    showToast(`Agregado: ${current.name} × ${qty}`);
+    const have = cart[current.id] || 0;
+    // Nunca más unidades que las disponibles
+    const next = Math.min(maxQuantity(current.stock), have + qty);
+    if (next <= have) {
+      showToast('No hay más unidades disponibles');
+      return;
+    }
+    updateCart({ ...cart, [current.id]: next });
+    showToast(`Agregado: ${current.name} × ${next - have}`);
     setCurrent(null);
   };
 
   const changeQty = (id: number, delta: number) => {
-    const next = { ...cart, [id]: (cart[id] || 0) + delta };
-    if (next[id] < 1) delete next[id];
+    const n = (cart[id] || 0) + delta;
+    if (delta > 0 && n > maxQuantity(stockOf(id))) return;
+    const next = { ...cart };
+    if (n < 1) delete next[id];
+    else next[id] = n;
     updateCart(next);
   };
+
+  // Datos derivados del producto abierto en la ficha
+  const currentPct = current ? discountPercent(current.price, current.compare_price) : null;
+  const currentOut = current ? isOutOfStock(current.stock) : false;
+  const currentStock = current ? stockLabel(current.stock) : null;
+  const currentMax = current ? maxQuantity(current.stock) : Infinity;
 
   return (
     <>
@@ -135,14 +217,23 @@ export function Catalog({
         </div>
       </header>
 
-      {(settings.tagline || settings.footer_note) && (
-        <section className="intro">
-          {settings.tagline && <h1>{settings.tagline}</h1>}
-          {settings.footer_note && <p>{settings.footer_note}</p>}
-        </section>
-      )}
+      <Hero
+        settings={settings}
+        stats={stats}
+        photos={heroPhotos}
+        waHref={waGeneral}
+        onBrowse={browse}
+      />
+      <Perks />
+      <CategoryTiles tiles={tiles} active={category} onPick={pickCategory} />
 
       <section className="tools">
+        <div className="sec-head" id="productos">
+          <h2 className="sec-t">{category === 'Todo' ? 'Todos los productos' : category}</h2>
+          <span className="sec-n">
+            {list.length} {list.length === 1 ? 'producto' : 'productos'}
+          </span>
+        </div>
         <div className="search">
           <IconSearch />
           <input
@@ -177,25 +268,20 @@ export function Catalog({
             </p>
           )}
           {list.map((p) => (
-            <button key={p.id} className="item" onClick={() => openProduct(p)}>
-              <span className="ph">
-                {p.photos[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`/uploads/${p.photos[0]}`} alt={p.name} loading="lazy" />
-                ) : (
-                  <IconPhoto />
-                )}
-              </span>
-              <span className="name">{p.name}</span>
-              <span className="price">{money(p.price)}</span>
-            </button>
+            <ProductCard key={p.id} product={p} onOpen={openProduct} />
           ))}
         </div>
       </main>
 
-      <footer className="site-footer">
-        <p>{settings.shop_name} — Pedidos por WhatsApp.</p>
-      </footer>
+      <SiteFooter
+        settings={settings}
+        categories={tabs.slice(1)}
+        waHref={waGeneral}
+        withBar={count > 0}
+        onPick={pickCategory}
+      />
+
+      {waGeneral && <WhatsAppFab href={waGeneral} raised={count > 0} />}
 
       {count > 0 && (
         <div className="order-bar">
@@ -219,45 +305,54 @@ export function Catalog({
             </button>
             {current.category && <span className="cat">{current.category}</span>}
             <h2>{current.name}</h2>
-            <div className="gallery">
-              {current.photos.length === 0 && (
-                <div className="shot">
-                  <IconPhoto />
-                </div>
-              )}
-              {current.photos.map((f) => (
-                <div className="shot" key={f}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/uploads/${f}`} alt={current.name} />
-                </div>
-              ))}
-            </div>
+            <Gallery photos={current.photos} alt={current.name} />
             <div className="price">
-              {money(current.price)} <small>por unidad</small>
+              {currentPct !== null && current.compare_price !== null ? (
+                <>
+                  <s>{money(current.compare_price)}</s> {money(current.price)}
+                  <span className="pct">{`-${currentPct}%`}</span>
+                </>
+              ) : (
+                money(current.price)
+              )}{' '}
+              <small>por unidad</small>
             </div>
+            {currentStock && (
+              <p className={currentOut ? 'stock-note out' : 'stock-note'}>
+                {currentOut ? 'Sin stock por el momento' : currentStock}
+              </p>
+            )}
             {current.description && <p className="desc">{current.description}</p>}
-            <div className="qty">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Restar uno">
-                <IconMinus />
-              </button>
-              <output>{qty}</output>
-              <button onClick={() => setQty(qty + 1)} aria-label="Sumar uno">
-                <IconPlus />
-              </button>
-            </div>
+            {!currentOut && (
+              <div className="qty">
+                <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Restar uno">
+                  <IconMinus />
+                </button>
+                <output>{qty}</output>
+                <button
+                  onClick={() => setQty(Math.min(currentMax, qty + 1))}
+                  disabled={qty >= currentMax}
+                  aria-label="Sumar uno"
+                >
+                  <IconPlus />
+                </button>
+              </div>
+            )}
             <div className="actions">
-              <button className="btn btn-primary" onClick={addToCart}>
-                Agregar al pedido
+              <button className="btn btn-primary" onClick={addToCart} disabled={currentOut}>
+                {currentOut ? 'Sin stock' : 'Agregar al pedido'}
               </button>
               <a
                 className="btn btn-ghost"
                 target="_blank"
                 rel="noopener"
                 href={waLink(
-                  `Hola, quería consultar por: ${current.name} (${money(current.price)}).`
+                  currentOut
+                    ? `Hola, quería saber si vuelve a haber: ${current.name}.`
+                    : `Hola, quería consultar por: ${current.name} (${money(current.price)}).`
                 )}
               >
-                Consultar solo este producto
+                {currentOut ? 'Consultar disponibilidad' : 'Consultar solo este producto'}
               </a>
             </div>
           </div>
@@ -282,14 +377,23 @@ export function Catalog({
                 <div className="line" key={x.p.id}>
                   <div className="nm">
                     {x.p.name}
-                    <small>{money(x.p.price)} c/u</small>
+                    <small>
+                      {money(x.p.price)} c/u
+                      {isOutOfStock(x.p.stock) && (
+                        <span className="warn"> · sin stock, a confirmar</span>
+                      )}
+                    </small>
                   </div>
                   <div className="st">
                     <button onClick={() => changeQty(x.p.id, -1)} aria-label="Restar">
                       <IconMinus />
                     </button>
                     <output>{x.n}</output>
-                    <button onClick={() => changeQty(x.p.id, 1)} aria-label="Sumar">
+                    <button
+                      onClick={() => changeQty(x.p.id, 1)}
+                      disabled={x.n >= maxQuantity(x.p.stock)}
+                      aria-label="Sumar"
+                    >
                       <IconPlus />
                     </button>
                   </div>

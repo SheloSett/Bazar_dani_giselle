@@ -1,9 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
 import type { AdminPhoto, AdminProduct, Category } from '@/lib/data';
-import { IconClose } from '@/components/icons';
+import { thumbUrl } from '@/lib/catalog';
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconClose,
+  IconUpload,
+} from '@/components/icons';
 
 export function ProductForm({
   categories: initialCategories,
@@ -20,6 +26,12 @@ export function ProductForm({
   const [name, setName] = useState(product?.name ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [price, setPrice] = useState(product ? String(product.price) : '');
+  const [comparePrice, setComparePrice] = useState(
+    product?.compare_price ? String(product.compare_price) : ''
+  );
+  const [stock, setStock] = useState(
+    product?.stock === null || product?.stock === undefined ? '' : String(product.stock)
+  );
   const [categoryId, setCategoryId] = useState<string>(
     product?.category_id ? String(product.category_id) : ''
   );
@@ -31,6 +43,8 @@ export function ProductForm({
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const addCategory = async () => {
@@ -61,6 +75,8 @@ export function ProductForm({
       name,
       description,
       price: Number(price),
+      compare_price: comparePrice.trim() ? Number(comparePrice) : null,
+      stock: stock.trim() ? Number(stock) : null,
       category_id: categoryId ? Number(categoryId) : null,
       visible,
     };
@@ -94,7 +110,7 @@ export function ProductForm({
   };
 
   const uploadPhotos = async (files: FileList | null) => {
-    if (!product || !files?.length) return;
+    if (!product || !files?.length || uploading) return;
     setUploading(true);
     setError('');
     const form = new FormData();
@@ -117,6 +133,41 @@ export function ProductForm({
   const removePhoto = async (photo: AdminPhoto) => {
     const res = await fetch(`/api/admin/photos/${photo.id}`, { method: 'DELETE' });
     if (res.ok) setPhotos((list) => list.filter((p) => p.id !== photo.id));
+  };
+
+  // Mueve una foto de lugar; la primera es la portada
+  const movePhoto = async (from: number, to: number) => {
+    if (!product || reordering || to < 0 || to >= photos.length) return;
+    const prev = photos;
+    const next = [...photos];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPhotos(next);
+    setReordering(true);
+    setError('');
+    const res = await fetch(`/api/admin/products/${product.id}/photos`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: next.map((p) => p.id) }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.photos) {
+      setPhotos(data.photos);
+    } else {
+      setPhotos(prev);
+      setError(data?.error || 'No se pudo cambiar el orden de las fotos');
+    }
+    setReordering(false);
+  };
+
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    if (!dragOver) setDragOver(true);
+  };
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    uploadPhotos(e.dataTransfer.files);
   };
 
   return (
@@ -149,6 +200,23 @@ export function ProductForm({
           />
         </div>
         <div className="fld">
+          <label htmlFor="compare-price">Precio anterior (si está en oferta)</label>
+          <input
+            id="compare-price"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={comparePrice}
+            onChange={(e) => setComparePrice(e.target.value)}
+            placeholder="Opcional"
+          />
+          <span className="hint">Se muestra tachado, con el porcentaje de descuento.</span>
+        </div>
+      </div>
+
+      <div className="fld-row">
+        <div className="fld">
           <label htmlFor="category">Categoría</label>
           <select
             id="category"
@@ -162,6 +230,23 @@ export function ProductForm({
               </option>
             ))}
           </select>
+        </div>
+        <div className="fld">
+          <label htmlFor="stock">Stock</label>
+          <input
+            id="stock"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={stock}
+            onChange={(e) => setStock(e.target.value)}
+            placeholder="Sin control"
+          />
+          <span className="hint">
+            Dejar vacío si no se controla. Con 0 aparece como “Sin stock”; con 3 o menos,
+            “Quedan pocas”.
+          </span>
         </div>
       </div>
 
@@ -201,35 +286,76 @@ export function ProductForm({
       {product ? (
         <div className="fld">
           <label>Fotos</label>
-          <div className="photos-grid">
-            {photos.map((ph, i) => (
-              <div className="photo-card" key={ph.id}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/uploads/${ph.filename}`} alt="" />
-                {i === 0 && <span className="cover-tag">Portada</span>}
-                <button
-                  type="button"
-                  className="del"
-                  onClick={() => removePhoto(ph)}
-                  aria-label="Quitar foto"
-                >
-                  <IconClose />
-                </button>
-              </div>
-            ))}
-          </div>
-          <input
-            ref={fileRef}
-            id="photos"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/avif"
-            multiple
-            onChange={(e) => uploadPhotos(e.target.files)}
-          />
+          {photos.length > 0 && (
+            <div className="photos-grid">
+              {photos.map((ph, i) => (
+                <div className="photo-card" key={ph.id}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={thumbUrl(ph.filename)} alt="" />
+                  {i === 0 && <span className="cover-tag">Portada</span>}
+                  <button
+                    type="button"
+                    className="del"
+                    onClick={() => removePhoto(ph)}
+                    aria-label="Quitar foto"
+                  >
+                    <IconClose />
+                  </button>
+                  {photos.length > 1 && (
+                    <span className="move">
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, i - 1)}
+                        disabled={i === 0 || reordering}
+                        aria-label="Mover a la izquierda"
+                      >
+                        <IconChevronLeft />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(i, i + 1)}
+                        disabled={i === photos.length - 1 || reordering}
+                        aria-label="Mover a la derecha"
+                      >
+                        <IconChevronRight />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <label
+            className={`dropzone${dragOver ? ' over' : ''}${uploading ? ' busy' : ''}`}
+            htmlFor="photos"
+            onDragOver={onDragOver}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+          >
+            <IconUpload />
+            <span>
+              {uploading ? (
+                'Subiendo fotos…'
+              ) : (
+                <>
+                  <strong>Arrastrá las fotos acá</strong> o tocá para elegirlas
+                </>
+              )}
+            </span>
+            <input
+              ref={fileRef}
+              id="photos"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              multiple
+              hidden
+              disabled={uploading}
+              onChange={(e) => uploadPhotos(e.target.files)}
+            />
+          </label>
           <span className="hint">
-            {uploading
-              ? 'Subiendo fotos…'
-              : 'JPG, PNG, WebP o AVIF, hasta 8 MB cada una. La primera es la portada.'}
+            JPG, PNG, WebP o AVIF, hasta 8 MB cada una; se achican y optimizan solas. La
+            primera es la portada: usá las flechas para ordenarlas.
           </span>
         </div>
       ) : (

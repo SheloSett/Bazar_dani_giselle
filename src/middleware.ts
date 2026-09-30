@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE, verifyToken } from '@/lib/auth';
+import { SESSION_COOKIE } from '@/lib/auth';
+import { verifySession } from '@/lib/credentials';
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const ok = await verifyToken(req.cookies.get(SESSION_COOKIE)?.value);
+  const ok = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
 
   if (pathname === '/admin/login') {
     // Si ya está logueado, directo al panel
@@ -19,4 +20,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: ['/admin/:path*'],
+  // Node en vez de edge: la sesión se valida contra la clave guardada en la base
+  runtime: 'nodejs',
 };

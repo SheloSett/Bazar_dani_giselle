@@ -1,5 +1,6 @@
 -- Datos de ejemplo para que el catálogo no arranque vacío.
--- Se cargan solo si la tabla de productos está vacía (lo controla scripts/migrate.mjs).
+-- Se cargan solo en una base nueva, sin productos, categorías ni ajustes
+-- (lo controla scripts/migrate.mjs).
 
 INSERT INTO categories (name, position) VALUES
   ('Mates y termos', 1),

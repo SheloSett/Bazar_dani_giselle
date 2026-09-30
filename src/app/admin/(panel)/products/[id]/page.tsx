@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getAdminProduct, listCategories, listProductPhotos } from '@/lib/data';
 import { ProductForm } from '@/components/admin/ProductForm';
+import { parseId } from '@/lib/validate';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +10,8 @@ export default async function EditProductPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const productId = Number(id);
-  if (!Number.isInteger(productId)) notFound();
+  const productId = parseId((await params).id);
+  if (!productId) notFound();
 
   const [product, categories, photos] = await Promise.all([
     getAdminProduct(productId),
