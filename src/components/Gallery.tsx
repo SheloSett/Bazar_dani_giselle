@@ -3,10 +3,12 @@
 import { useState, type CSSProperties, type MouseEvent } from 'react';
 import { photoUrl, thumbUrl } from '@/lib/catalog';
 import { useSnapStrip } from '@/components/useSnapStrip';
+import { FitPhoto } from '@/components/FitPhoto';
 import { IconChevronLeft, IconChevronRight, IconPhoto } from '@/components/icons';
 
-// Galería de la ficha: foto grande deslizable, flechas, miniaturas y zoom al
-// pasar el mouse (solo en dispositivos con puntero; en el celular se desliza).
+// Galería de la ficha: foto grande deslizable (siempre entera), flechas, miniaturas y
+// zoom con clic (solo con mouse; en el celular se desliza). No es al pasar el mouse:
+// la ficha se abre donde se hizo clic y el zoom se activaba solo.
 export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
   const strip = useSnapStrip(photos.length);
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null);
@@ -19,12 +21,12 @@ export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
     );
   }
 
-  const trackZoom = (e: MouseEvent<HTMLDivElement>) => {
+  const pointer = (e: MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    setZoom({
+    return {
       x: ((e.clientX - r.left) / r.width) * 100,
       y: ((e.clientY - r.top) / r.height) * 100,
-    });
+    };
   };
 
   const zoomStyle = zoom
@@ -40,14 +42,14 @@ export function Gallery({ photos, alt }: { photos: string[]; alt: string }) {
               key={f}
               className={zoom && i === strip.idx ? 'g-slide zoom' : 'g-slide'}
               style={i === strip.idx ? zoomStyle : undefined}
-              onMouseMove={trackZoom}
+              onClick={(e) => setZoom(zoom ? null : pointer(e))}
+              onMouseMove={(e) => zoom && setZoom(pointer(e))}
               onMouseLeave={() => setZoom(null)}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <FitPhoto
                 src={photoUrl(f)}
                 alt={photos.length > 1 ? `${alt} (${i + 1} de ${photos.length})` : alt}
-                draggable={false}
+                fit="whole"
               />
             </div>
           ))}

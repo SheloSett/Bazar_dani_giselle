@@ -1,6 +1,16 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseId, parseOptionalPrice, parsePrice, parseStock } from '@/lib/validate';
+import {
+  ORDER_TOKEN_RE,
+  parseCategoryName,
+  parseCustomerName,
+  parseId,
+  parseOptionalPrice,
+  parseOrderItems,
+  parsePhone,
+  parsePrice,
+  parseStock,
+} from '@/lib/validate';
 
 describe('parseId', () => {
   test('acepta enteros positivos como texto o número', () => {
@@ -61,5 +71,72 @@ describe('parseStock', () => {
     for (const v of ['-1', '1.5', 1.5, 'abc', '3000000000', true, {}]) {
       assert.equal(parseStock(v), null, String(v));
     }
+  });
+});
+
+describe('parseCategoryName', () => {
+  test('recorta y junta espacios de más', () => {
+    assert.equal(parseCategoryName('  Mates   y termos '), 'Mates y termos');
+    assert.equal(parseCategoryName('x'.repeat(60)), 'x'.repeat(60));
+  });
+
+  test('rechaza vacíos, muy largos o que no son texto', () => {
+    for (const v of ['', '   ', 'x'.repeat(61), null, undefined, 12, {}]) {
+      assert.equal(parseCategoryName(v), null, String(v));
+    }
+  });
+});
+
+describe('pedidos (ruta pública)', () => {
+  test('acepta ítems válidos y suma los productos repetidos', () => {
+    assert.deepEqual(parseOrderItems([{ id: 3, quantity: 2 }]), [{ id: 3, quantity: 2 }]);
+    assert.deepEqual(
+      parseOrderItems([{ id: 3, quantity: 2 }, { id: 5, quantity: 1 }, { id: 3, quantity: 4 }]),
+      [{ id: 3, quantity: 6 }, { id: 5, quantity: 1 }]
+    );
+  });
+
+  test('ignora lo que venga de más (el precio no se toma del navegador)', () => {
+    assert.deepEqual(parseOrderItems([{ id: 3, quantity: 1, price: 1, name: 'x' }]), [
+      { id: 3, quantity: 1 },
+    ]);
+  });
+
+  test('rechaza listas vacías, enormes o con datos raros', () => {
+    const many = Array.from({ length: 101 }, (_, i) => ({ id: i + 1, quantity: 1 }));
+    const bad = [
+      [], many, null, undefined, 'x', {}, [null], [{}], [{ id: 0, quantity: 1 }],
+      [{ id: 3, quantity: 0 }], [{ id: 3, quantity: -1 }], [{ id: 3, quantity: 1.5 }],
+      [{ id: 3, quantity: '2' }], [{ id: 'abc', quantity: 1 }], [{ id: 3, quantity: 10000 }],
+      [{ id: 3, quantity: 9999 }, { id: 3, quantity: 1 }],
+    ];
+    for (const v of bad) assert.equal(parseOrderItems(v), null, JSON.stringify(v)?.slice(0, 60));
+  });
+
+  test('formato del código del link', () => {
+    assert.equal(ORDER_TOKEN_RE.test('aZ09_-aZ09_-aZ09'), true);
+    for (const t of ['corto', 'con espacio 1234567', '../../etc/passwd..', 'a'.repeat(41), ''])
+      assert.equal(ORDER_TOKEN_RE.test(t), false, t);
+  });
+});
+
+describe('datos de quien pide', () => {
+  test('nombre: recorta espacios y exige de 2 a 80 caracteres', () => {
+    assert.equal(parseCustomerName('  Giselle   Bodek '), 'Giselle Bodek');
+    assert.equal(parseCustomerName('Lu'), 'Lu');
+    for (const v of ['', ' ', 'a', 'x'.repeat(81), null, undefined, 12, {}])
+      assert.equal(parseCustomerName(v), null, String(v));
+  });
+
+  test('teléfono: acepta el formato que escriba la persona y guarda solo dígitos', () => {
+    assert.equal(parsePhone('11 4066-2350'), '1140662350');
+    assert.equal(parsePhone('+54 9 (11) 4066-2350'), '5491140662350');
+    assert.equal(parsePhone('011.4066.2350'), '01140662350');
+    assert.equal(parsePhone('40662350'), '40662350');
+  });
+
+  test('teléfono: rechaza lo que no es un teléfono', () => {
+    for (const v of ['', '1234567', 'no tengo', '11 4066 2350 int 3', '1'.repeat(16), ' '.repeat(50), 1140662350, null, undefined])
+      assert.equal(parsePhone(v), null, String(v));
   });
 });

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { PublicProduct, Settings } from '@/lib/data';
+import { CUSTOMER_NAME_MAX, parseCustomerName, parsePhone } from '@/lib/validate';
 import {
   discountPercent,
   isOutOfStock,
@@ -9,8 +10,9 @@ import {
   maxQuantity,
   money,
   photoUrl,
-  stockLabel,
+  stockDetail,
   thumbUrl,
+  unavailableNotice,
 } from '@/lib/catalog';
 import { ProductCard } from '@/components/ProductCard';
 import { Gallery } from '@/components/Gallery';
@@ -27,33 +29,55 @@ import {
 } from '@/components/icons';
 
 const CART_KEY = 'catalogo-cart';
+// Nombre de cada producto del carrito, para poder avisar cuál ya no está si se oculta
+// o se borra del catálogo mientras la persona no hizo el pedido
+const CART_NAMES_KEY = 'catalogo-cart-nombres';
+// Nombre y teléfono de quien pide: se recuerdan en este navegador para el próximo pedido
+const CUSTOMER_KEY = 'catalogo-cliente';
 
 type Cart = Record<number, number>; // product id -> cantidad
+type CartNames = Record<number, string>; // product id -> nombre
 
-function loadCart(): Cart {
+function readStore<T extends object>(key: string): T {
   try {
-    const raw = localStorage.getItem(CART_KEY);
-    return raw ? (JSON.parse(raw) as Cart) : {};
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : ({} as T);
   } catch {
-    return {};
+    return {} as T;
   }
 }
 
-function persistCart(cart: Cart) {
+function writeStore(key: string, value: object) {
   try {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     /* almacenamiento no disponible: el carrito vive solo en memoria */
   }
 }
 
+// Código del link del pedido: 12 bytes al azar en base64url (imposible de adivinar).
+// getRandomValues funciona también sin HTTPS, a diferencia de randomUUID.
+function newOrderToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+const persistCart = (cart: Cart) => writeStore(CART_KEY, cart);
+const rememberName = (id: number, name: string) =>
+  writeStore(CART_NAMES_KEY, { ...readStore<CartNames>(CART_NAMES_KEY), [id]: name });
+
 export function Catalog({
   products,
   categories,
+  categoryPhotos = {},
   settings,
 }: {
   products: PublicProduct[];
   categories: string[];
+  categoryPhotos?: Record<string, string>; // nombre de categoría -> foto propia del rubro
   settings: Settings;
 }) {
   const [cart, setCart] = useState<Cart>({});
@@ -64,10 +88,68 @@ export function Catalog({
   const [cartOpen, setCartOpen] = useState(false);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [removedNote, setRemovedNote] = useState(''); // detalle en "Tu pedido"
+  // Quién pide: nombre y teléfono, obligatorios para enviar
+  const [customer, setCustomer] = useState({ name: '', phone: '' });
+  const [customerErrors, setCustomerErrors] = useState(false);
+  const customerName = parseCustomerName(customer.name);
+  const customerPhone = parsePhone(customer.phone);
 
   useEffect(() => {
-    setCart(loadCart());
+    const saved = readStore<{ name?: unknown; phone?: unknown }>(CUSTOMER_KEY);
+    setCustomer({
+      name: typeof saved.name === 'string' ? saved.name : '',
+      phone: typeof saved.phone === 'string' ? saved.phone : '',
+    });
   }, []);
+
+  const updateCustomer = (patch: Partial<typeof customer>) => {
+    const next = { ...customer, ...patch };
+    setCustomer(next);
+    writeStore(CUSTOMER_KEY, next);
+  };
+
+  // Link al detalle con fotos que va en el mensaje. Cada cambio del carrito o de los
+  // datos es otro pedido, con otro código; tocar "Enviar" dos veces sin cambios
+  // reusa el mismo.
+  const [orderLink, setOrderLink] = useState<{ token: string; url: string } | null>(null);
+
+  useEffect(() => {
+    const token = newOrderToken();
+    setOrderLink({ token, url: `${window.location.origin}/pedido/${token}` });
+  }, [cart, customer.name, customer.phone]);
+
+  const showToast = useCallback((text: string, ms = 1800) => {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), ms);
+  }, []);
+
+  // Carga el carrito guardado. Si algún producto ya no está en el catálogo (se ocultó o
+  // se borró desde el panel), lo saca y avisa, en vez de hacerlo desaparecer en silencio.
+  useEffect(() => {
+    const saved = readStore<Cart>(CART_KEY);
+    const names = readStore<CartNames>(CART_NAMES_KEY);
+    const ids = Object.keys(saved).map(Number);
+    const gone = ids.filter((id) => !products.some((p) => p.id === id));
+    if (gone.length) {
+      for (const id of gone) delete saved[id];
+      persistCart(saved);
+      const known = gone.map((id) => names[id]).filter((n): n is string => !!n);
+      setRemovedNote(unavailableNotice(known, gone.length - known.length) ?? '');
+      showToast(
+        gone.length === 1
+          ? '1 producto de tu pedido ya no está disponible'
+          : `${gone.length} productos de tu pedido ya no están disponibles`,
+        5000
+      );
+    }
+    // Nombres al día solo de lo que queda (completa los de carritos guardados antes)
+    const fresh: CartNames = {};
+    for (const p of products) if (saved[p.id]) fresh[p.id] = p.name;
+    writeStore(CART_NAMES_KEY, fresh);
+    setCart(saved);
+  }, [products, showToast]);
 
   const updateCart = (next: Cart) => {
     setCart(next);
@@ -81,15 +163,15 @@ export function Catalog({
     [categories, products]
   );
 
-  // Tapa de cada rubro: la foto del primer producto que tenga
+  // Tapa de cada rubro: su foto propia (se carga en el panel) o la del primer producto que tenga
   const tiles = useMemo(
     () =>
       tabs.slice(1).map((c) => {
         const inCat = products.filter((p) => p.category === c);
-        const cover = inCat.find((p) => p.photos.length > 0);
-        return { name: c, count: inCat.length, photo: cover ? thumbUrl(cover.photos[0]) : null };
+        const cover = categoryPhotos[c] ?? inCat.find((p) => p.photos.length > 0)?.photos[0];
+        return { name: c, count: inCat.length, photo: cover ? thumbUrl(cover) : null };
       }),
-    [tabs, products]
+    [tabs, products, categoryPhotos]
   );
 
   // Collage de la portada: hasta 3 fotos, una por rubro y distintas de las tapas
@@ -138,7 +220,44 @@ export function Catalog({
           (isOutOfStock(x.p.stock) ? ' (sin stock, a confirmar)' : '')
       )
       .join('\n');
-    return `Hola, les paso mi pedido desde el catálogo:\n${lines}\nTotal estimado: ${money(total)}\n¿Me confirman cotización y entrega?`;
+    const hello = customerName ? `Hola, soy ${customerName}.` : 'Hola.';
+    const phone = customer.phone.trim() ? `\nMi teléfono: ${customer.phone.trim()}` : '';
+    const link = orderLink ? `\nVer pedido con fotos: ${orderLink.url}` : '';
+    return `${hello} Les paso mi pedido desde el catálogo:\n${lines}\nTotal estimado: ${money(total)}${phone}${link}\n¿Me confirman cotización y entrega?`;
+  };
+
+  // Guarda el pedido: así queda en el panel y el link del mensaje funciona. Sale al
+  // tocar "Enviar", sin frenar la apertura de WhatsApp. Si falla, avisa: el mensaje
+  // igual lleva todo el detalle.
+  const saveOrder = () => {
+    if (!orderLink) return;
+    const failed = () =>
+      showToast('No pudimos registrar el pedido. Envialo igual por WhatsApp.', 6000);
+    fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        token: orderLink.token,
+        items: items.map((x) => ({ id: x.p.id, quantity: x.n })),
+        customer: { name: customer.name, phone: customer.phone },
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) failed();
+      })
+      .catch(failed);
+  };
+
+  // Sin nombre y teléfono no se envía: marca lo que falta y lleva el cursor ahí
+  const sendOrder = (e: MouseEvent) => {
+    if (!customerName || !customerPhone) {
+      e.preventDefault();
+      setCustomerErrors(true);
+      document.getElementById(customerName ? 'cliente-tel' : 'cliente-nombre')?.focus();
+      return;
+    }
+    saveOrder();
   };
 
   const waLink = (text: string) =>
@@ -162,12 +281,6 @@ export function Catalog({
     browse();
   };
 
-  const showToast = (text: string) => {
-    setToast(text);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(''), 1800);
-  };
-
   const openProduct = (p: PublicProduct) => {
     setCurrent(p);
     setQty(1);
@@ -183,6 +296,7 @@ export function Catalog({
       return;
     }
     updateCart({ ...cart, [current.id]: next });
+    rememberName(current.id, current.name);
     showToast(`Agregado: ${current.name} × ${next - have}`);
     setCurrent(null);
   };
@@ -199,7 +313,12 @@ export function Catalog({
   // Datos derivados del producto abierto en la ficha
   const currentPct = current ? discountPercent(current.price, current.compare_price) : null;
   const currentOut = current ? isOutOfStock(current.stock) : false;
-  const currentStock = current ? stockLabel(current.stock) : null;
+  // En la ficha va la cantidad exacta ("Quedan 3 unidades"), no la etiqueta corta
+  const currentStock = current
+    ? currentOut
+      ? 'Sin stock por el momento'
+      : stockDetail(current.stock)
+    : null;
   const currentMax = current ? maxQuantity(current.stock) : Infinity;
 
   return (
@@ -319,7 +438,7 @@ export function Catalog({
             </div>
             {currentStock && (
               <p className={currentOut ? 'stock-note out' : 'stock-note'}>
-                {currentOut ? 'Sin stock por el momento' : currentStock}
+                {currentStock}
               </p>
             )}
             {current.description && <p className="desc">{current.description}</p>}
@@ -369,6 +488,11 @@ export function Catalog({
               <IconClose />
             </button>
             <h2>Tu pedido</h2>
+            {removedNote && (
+              <p className="cart-note" role="status">
+                {removedNote}
+              </p>
+            )}
             <div className="lines">
               {items.length === 0 && (
                 <p className="empty">Tu pedido está vacío. Tocá un producto para sumarlo.</p>
@@ -406,6 +530,43 @@ export function Catalog({
                   <span>Total estimado</span>
                   <span className="v">{money(total)}</span>
                 </div>
+                <div className="who">
+                  <p className="pv-label">Tus datos, para coordinar el pedido:</p>
+                  <div className="who-row">
+                    <label>
+                      Nombre y apellido
+                      <input
+                        id="cliente-nombre"
+                        autoComplete="name"
+                        maxLength={CUSTOMER_NAME_MAX}
+                        value={customer.name}
+                        onChange={(e) => updateCustomer({ name: e.target.value })}
+                        aria-invalid={customerErrors && !customerName}
+                      />
+                    </label>
+                    <label>
+                      Teléfono
+                      <input
+                        id="cliente-tel"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        maxLength={40}
+                        placeholder="11 2345-6789"
+                        value={customer.phone}
+                        onChange={(e) => updateCustomer({ phone: e.target.value })}
+                        aria-invalid={customerErrors && !customerPhone}
+                      />
+                    </label>
+                  </div>
+                  {customerErrors && (!customerName || !customerPhone) && (
+                    <p className="who-err" role="alert">
+                      {!customerName
+                        ? 'Escribí tu nombre para enviar el pedido.'
+                        : 'Escribí un teléfono válido (con código de área) para enviar el pedido.'}
+                    </p>
+                  )}
+                </div>
                 <p className="pv-label">Así llega el mensaje al negocio:</p>
                 <div className="preview">{orderMessage()}</div>
                 <div className="actions">
@@ -414,6 +575,7 @@ export function Catalog({
                     target="_blank"
                     rel="noopener"
                     href={waLink(orderMessage())}
+                    onClick={sendOrder}
                   >
                     <IconWhatsApp /> Enviar pedido por WhatsApp
                   </a>

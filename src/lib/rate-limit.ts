@@ -55,6 +55,7 @@ export function createLoginLimiter(
 
 const globalForLimiter = globalThis as unknown as {
   loginLimiter?: ReturnType<typeof createLoginLimiter>;
+  orderLimiter?: ReturnType<typeof createLoginLimiter>;
 };
 
 // 5 fallos por IP y 30 en total cada 15 minutos
@@ -63,3 +64,22 @@ export const loginLimiter = (globalForLimiter.loginLimiter ??= createLoginLimite
   maxPerIp: 5,
   maxGlobal: 30,
 }));
+
+// Pedidos guardados desde el catálogo (ruta pública): acá cada pedido cuenta como
+// un evento ("fail"). 12 por IP y 240 en total cada 10 minutos, para que nadie
+// llene la base de pedidos falsos.
+export const orderLimiter = (globalForLimiter.orderLimiter ??= createLoginLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxPerIp: 12,
+  maxGlobal: 240,
+}));
+
+// IP de quien hace el pedido. Sin proxy delante, Next la toma de la conexión;
+// con proxy (Caddy) llega en X-Forwarded-For.
+export function clientIp(headers: Headers): string {
+  return (
+    headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    headers.get('x-real-ip') ||
+    'desconocida'
+  );
+}

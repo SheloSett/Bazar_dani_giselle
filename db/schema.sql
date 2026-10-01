@@ -39,3 +39,36 @@ CREATE INDEX IF NOT EXISTS idx_photos_product    ON product_photos(product_id);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_price INTEGER;
 -- Unidades disponibles; NULL = no se controla el stock (siempre disponible)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER;
+-- Foto propia del rubro en el catálogo; NULL = se usa la del primer producto
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS photo TEXT;
+
+-- Pedidos armados en el catálogo. Se guardan al tocar "Enviar pedido por WhatsApp"
+-- para que el mensaje lleve un link al detalle con fotos (/pedido/<token>).
+-- No guardan datos de quien pide.
+CREATE TABLE IF NOT EXISTS orders (
+  id         SERIAL PRIMARY KEY,
+  -- Código del link: aleatorio, imposible de adivinar
+  token      TEXT NOT NULL UNIQUE,
+  total      INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Nombre, precio y foto quedan copiados como estaban al pedir: si después cambia
+-- o se borra el producto, el pedido sigue mostrando lo que se pidió
+CREATE TABLE IF NOT EXISTS order_items (
+  id         SERIAL PRIMARY KEY,
+  order_id   INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INT REFERENCES products(id) ON DELETE SET NULL,
+  name       TEXT NOT NULL,
+  price      INTEGER NOT NULL,
+  quantity   INTEGER NOT NULL,
+  photo      TEXT,
+  position   INT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
+-- Quién hizo el pedido (obligatorios al pedir). Datos personales: se ven solo en el
+-- panel, nunca en la página pública del pedido. El teléfono se guarda solo con dígitos.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name  TEXT NOT NULL DEFAULT '';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT NOT NULL DEFAULT '';

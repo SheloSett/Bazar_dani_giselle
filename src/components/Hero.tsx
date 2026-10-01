@@ -2,6 +2,7 @@
 
 import type { Settings } from '@/lib/data';
 import { IconStore, IconTruck, IconWhatsApp } from '@/components/icons';
+import { FitPhoto } from '@/components/FitPhoto';
 
 // Portada: bloque de color con el título, los botones y un collage de fotos
 export function Hero({
@@ -39,8 +40,7 @@ export function Hero({
           // Decorativo: los mismos productos están en la grilla con su nombre
           <div className={`hero-pics n${photos.length}`} aria-hidden="true">
             {photos.map((src) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={src} src={src} alt="" />
+              <FitPhoto key={src} src={src} alt="" fit="cover" />
             ))}
           </div>
         )}

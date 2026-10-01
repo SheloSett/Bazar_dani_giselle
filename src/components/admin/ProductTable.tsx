@@ -14,7 +14,14 @@ function StockCell({ stock }: { stock: number | null }) {
   return <>{stock}</>;
 }
 
-export function ProductTable({ initial }: { initial: AdminProduct[] }) {
+// embedded: dentro de otra página (ej. categorías), sin título ni columna de categoría
+export function ProductTable({
+  initial,
+  embedded = false,
+}: {
+  initial: AdminProduct[];
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [products, setProducts] = useState(initial);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -47,18 +54,20 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
 
   return (
     <>
-      <div className="adm-top">
-        <h1>Productos</h1>
-        <Link className="btn-sm" href="/admin/products/new">
-          Nuevo producto
-        </Link>
-      </div>
+      {!embedded && (
+        <div className="adm-top">
+          <h1>Productos</h1>
+          <Link className="btn-sm" href="/admin/products/new">
+            Nuevo producto
+          </Link>
+        </div>
+      )}
       <table className="tbl">
         <thead>
           <tr>
             <th></th>
             <th>Nombre</th>
-            <th>Categoría</th>
+            {!embedded && <th>Categoría</th>}
             <th>Precio</th>
             <th>Stock</th>
             <th>Estado</th>
@@ -68,7 +77,7 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
         <tbody>
           {products.length === 0 && (
             <tr>
-              <td colSpan={7} className="empty">
+              <td colSpan={embedded ? 6 : 7} className="empty">
                 Todavía no hay productos. Creá el primero con “Nuevo producto”.
               </td>
             </tr>
@@ -86,7 +95,7 @@ export function ProductTable({ initial }: { initial: AdminProduct[] }) {
                 )}
               </td>
               <td>{p.name}</td>
-              <td>{p.category ?? '—'}</td>
+              {!embedded && <td>{p.category ?? '—'}</td>}
               <td className="price-cell">
                 {p.compare_price !== null && p.compare_price > p.price && (
                   <>

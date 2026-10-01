@@ -54,6 +54,9 @@ export default async function HomePage() {
     <Catalog
       products={products}
       categories={categories.map((c) => c.name)}
+      categoryPhotos={Object.fromEntries(
+        categories.flatMap((c) => (c.photo ? [[c.name, c.photo]] : []))
+      )}
       settings={settings}
     />
   );

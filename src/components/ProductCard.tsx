@@ -1,8 +1,16 @@
 'use client';
 
 import type { PublicProduct } from '@/lib/data';
-import { discountPercent, isOutOfStock, money, stockLabel, thumbUrl } from '@/lib/catalog';
+import {
+  discountPercent,
+  isOutOfStock,
+  money,
+  stockDetail,
+  stockLabel,
+  thumbUrl,
+} from '@/lib/catalog';
 import { useSnapStrip } from '@/components/useSnapStrip';
+import { FitPhoto } from '@/components/FitPhoto';
 import { IconChevronLeft, IconChevronRight, IconPhoto } from '@/components/icons';
 
 export function ProductCard({
@@ -16,6 +24,7 @@ export function ProductCard({
   const pct = discountPercent(p.price, p.compare_price);
   const out = isOutOfStock(p.stock);
   const low = out ? null : stockLabel(p.stock);
+  const lowDetail = stockDetail(p.stock);
   const open = () => onOpen(p);
 
   return (
@@ -28,20 +37,25 @@ export function ProductCard({
         ) : (
           <div className="ph-strip" ref={strip.ref} onScroll={strip.onScroll} onClick={open}>
             {p.photos.map((f, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <FitPhoto
                 key={f}
                 src={thumbUrl(f)}
                 alt={i === 0 ? p.name : `${p.name} (foto ${i + 1})`}
                 loading="lazy"
-                draggable={false}
               />
             ))}
           </div>
         )}
 
         {pct !== null && <span className="badge off">{`-${pct}%`}</span>}
-        {low && <span className="badge low">{low}</span>}
+        {low && (
+          // Con el mouse encima muestra cuántas quedan; el clic abre el producto como
+          // el resto de la tarjeta (en el celular la cantidad se ve en la ficha)
+          <button type="button" className="badge low" onClick={open} tabIndex={-1}>
+            {low}
+            {lowDetail && <span className="tip">{lowDetail}</span>}
+          </button>
+        )}
         {out && <span className="out-tag">Sin stock</span>}
 
         {p.photos.length > 1 && (

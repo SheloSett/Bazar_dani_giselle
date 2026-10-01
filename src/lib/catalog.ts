@@ -20,13 +20,35 @@ export function isOutOfStock(stock: number | null): boolean {
   return stock !== null && stock <= 0;
 }
 
-// Aviso de stock para mostrar, o null si no hay nada que avisar
+// Etiqueta corta de la tarjeta, o null si no hay nada que avisar
 export function stockLabel(stock: number | null): string | null {
   if (stock === null) return null;
   if (stock <= 0) return 'Sin stock';
   if (stock === 1) return 'Última unidad';
-  if (stock <= LOW_STOCK) return `Quedan ${stock}`;
+  if (stock <= LOW_STOCK) return 'Últimas unidades';
   return null;
+}
+
+// Cantidad exacta cuando quedan pocas: en la ficha y al pasar el mouse por la etiqueta
+export function stockDetail(stock: number | null): string | null {
+  if (stock === null || stock <= 0 || stock > LOW_STOCK) return null;
+  return stock === 1 ? 'Queda 1 unidad' : `Quedan ${stock} unidades`;
+}
+
+// Aviso cuando productos guardados en el carrito ya no están en el catálogo (se
+// ocultaron o se borraron). `unnamed`: los de carritos viejos, sin el nombre guardado.
+export function unavailableNotice(names: string[], unnamed = 0): string | null {
+  const total = names.length + unnamed;
+  if (!total) return null;
+  if (names.length === 1 && !unnamed)
+    return `«${names[0]}» ya no está disponible y lo sacamos de tu pedido.`;
+  if (!names.length)
+    return total === 1
+      ? '1 producto de tu pedido ya no está disponible y lo sacamos.'
+      : `${total} productos de tu pedido ya no están disponibles y los sacamos.`;
+  const more = unnamed ? ` y ${unnamed} ${unnamed === 1 ? 'producto más' : 'productos más'}` : '';
+  const list = names.map((n) => `«${n}»`).join(', ');
+  return `Estos productos ya no están disponibles y los sacamos de tu pedido: ${list}${more}.`;
 }
 
 // Descuento entero respecto del precio anterior, o null si no hay oferta real
@@ -64,3 +86,15 @@ export const thumbUrl = (filename: string) => `/uploads/${thumbName(filename)}`;
 
 // Imagen JPEG para la vista previa al compartir el link (WhatsApp no muestra WebP)
 export const ogImagePath = (filename: string) => `/og/${filename.replace(/\.\w+$/, '')}.jpg`;
+
+// ---------- WhatsApp ----------
+
+// Teléfono de un cliente → número para wa.me. Los celulares argentinos van como
+// 549 + área + número: se completa lo que falte. Si no parece argentino, queda igual.
+export function waNumber(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  if (d.startsWith('549')) return d;
+  if (d.startsWith('54')) return '549' + d.slice(2);
+  const local = d.replace(/^0/, ''); // 011… → 11…
+  return local.length === 10 ? '549' + local : d;
+}

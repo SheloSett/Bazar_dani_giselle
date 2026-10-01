@@ -1,15 +1,28 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { AdminPhoto, AdminProduct, Category } from '@/lib/data';
-import { thumbUrl } from '@/lib/catalog';
+import { discountPercent, thumbUrl } from '@/lib/catalog';
 import {
   IconChevronLeft,
   IconChevronRight,
   IconClose,
   IconUpload,
 } from '@/components/icons';
+import { CategoryPicker } from '@/components/admin/CategoryPicker';
+
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+// Aviso que viaja de "Nuevo producto" a la pantalla de edición a la que se pasa al crear
+const FLASH_KEY = 'producto-creado';
+
+// Foto elegida en "Nuevo producto": espera en el navegador hasta que el producto existe
+interface PendingPhoto {
+  key: string;
+  file: File;
+  url: string;
+}
 
 export function ProductForm({
   categories: initialCategories,
@@ -22,6 +35,7 @@ export function ProductForm({
 }) {
   const router = useRouter();
   const isNew = !product;
+  const productId = product?.id;
 
   const [name, setName] = useState(product?.name ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
@@ -37,37 +51,76 @@ export function ProductForm({
   );
   const [visible, setVisible] = useState(product?.visible ?? true);
   const [categories, setCategories] = useState(initialCategories);
-  const [newCategory, setNewCategory] = useState('');
   const [photos, setPhotos] = useState<AdminPhoto[]>(initialPhotos);
+  const [pending, setPending] = useState<PendingPhoto[]>([]);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState('Guardando…');
   const [uploading, setUploading] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef<PendingPhoto[]>([]);
+  const pendingSeq = useRef(0);
 
-  const addCategory = async () => {
-    const nm = newCategory.trim();
-    if (!nm) return;
+  // Al llegar desde "Nuevo producto": muestra cómo salió la creación
+  useEffect(() => {
+    if (!productId) return;
+    try {
+      const raw = sessionStorage.getItem(FLASH_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(FLASH_KEY);
+      const flash = JSON.parse(raw) as { id: number; error?: string };
+      if (flash.id !== productId) return;
+      if (flash.error) setError(flash.error);
+      else setOk('Producto creado');
+    } catch {
+      /* sin almacenamiento: no hay aviso */
+    }
+  }, [productId]);
+
+  // Las vistas previas ocupan memoria del navegador: se liberan al salir
+  useEffect(() => {
+    pendingRef.current = pending;
+  }, [pending]);
+  useEffect(() => () => pendingRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
+
+  // La crea el selector de categoría ("Crear «…»"); si ya existía con ese nombre, vuelve esa
+  const createCategory = async (nm: string): Promise<Category | null> => {
+    setError('');
     const res = await fetch('/api/admin/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: nm }),
     });
-    if (res.ok) {
-      const cat: Category = await res.json();
-      setCategories((list) =>
-        list.some((c) => c.id === cat.id) ? list : [...list, cat]
-      );
-      setCategoryId(String(cat.id));
-      setNewCategory('');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || 'No se pudo crear la categoría');
+      return null;
     }
+    const cat = data as Category;
+    setCategories((list) => (list.some((c) => c.id === cat.id) ? list : [...list, cat]));
+    return cat;
+  };
+
+  // Sube las fotos en espera al producto recién creado. Devuelve el problema, si hubo
+  const uploadPending = async (id: number): Promise<string> => {
+    const form = new FormData();
+    for (const p of pending) form.append('photos', p.file);
+    const res = await fetch(`/api/admin/products/${id}/photos`, { method: 'POST', body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data)
+      return 'El producto se creó, pero no se pudieron subir las fotos. Probá subirlas de nuevo.';
+    if (data.errors?.length)
+      return `El producto se creó, pero algunas fotos no se subieron: ${data.errors.join(' · ')}`;
+    return '';
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    setBusyLabel('Guardando…');
     setError('');
     setOk('');
 
@@ -99,7 +152,17 @@ export function ProductForm({
 
     if (isNew) {
       const { id } = await res.json();
-      // Recién creado: pasa a la pantalla de edición para cargar las fotos
+      let photoError = '';
+      if (pending.length) {
+        setBusyLabel('Subiendo fotos…');
+        photoError = await uploadPending(id);
+      }
+      try {
+        sessionStorage.setItem(FLASH_KEY, JSON.stringify({ id, error: photoError }));
+      } catch {
+        /* sin almacenamiento: se pasa igual, sin aviso */
+      }
+      // Ya existe: sigue en su pantalla de edición
       router.push(`/admin/products/${id}`);
       router.refresh();
     } else {
@@ -108,6 +171,8 @@ export function ProductForm({
       router.refresh();
     }
   };
+
+  // ---------- fotos de un producto que ya existe: se suben y ordenan al momento ----------
 
   const uploadPhotos = async (files: FileList | null) => {
     if (!product || !files?.length || uploading) return;
@@ -160,6 +225,51 @@ export function ProductForm({
     setReordering(false);
   };
 
+  // ---------- fotos de un producto nuevo: quedan en espera hasta crearlo ----------
+
+  const queuePhotos = (files: FileList | null) => {
+    if (!files?.length || busy) return;
+    const added: PendingPhoto[] = [];
+    const rejected: string[] = [];
+    for (const file of Array.from(files)) {
+      if (!PHOTO_TYPES.includes(file.type)) rejected.push(`${file.name}: formato no admitido`);
+      else if (file.size > MAX_PHOTO_BYTES) rejected.push(`${file.name}: supera los 8 MB`);
+      else
+        added.push({
+          key: `p${pendingSeq.current++}`,
+          file,
+          url: URL.createObjectURL(file),
+        });
+    }
+    if (added.length) setPending((list) => [...list, ...added]);
+    setError(rejected.join(' · '));
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const removePending = (index: number) => {
+    URL.revokeObjectURL(pending[index].url);
+    setPending((list) => list.filter((_, i) => i !== index));
+  };
+
+  const movePending = (from: number, to: number) => {
+    if (to < 0 || to >= pending.length) return;
+    const next = [...pending];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setPending(next);
+  };
+
+  // Una sola grilla para los dos casos
+  const shots = product
+    ? photos.map((ph) => ({ key: String(ph.id), src: thumbUrl(ph.filename) }))
+    : pending.map((p) => ({ key: p.key, src: p.url }));
+  const addFiles = (files: FileList | null) =>
+    product ? uploadPhotos(files) : queuePhotos(files);
+  const removeShot = (i: number) => (product ? removePhoto(photos[i]) : removePending(i));
+  const moveShot = (from: number, to: number) =>
+    product ? movePhoto(from, to) : movePending(from, to);
+  const photosBusy = uploading || (isNew && busy);
+
   const onDragOver = (e: DragEvent) => {
     e.preventDefault();
     if (!dragOver) setDragOver(true);
@@ -167,214 +277,231 @@ export function ProductForm({
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    uploadPhotos(e.dataTransfer.files);
+    addFiles(e.dataTransfer.files);
   };
 
+  // Cómo va a quedar la oferta con lo que hay escrito ahora
+  const bothPrices = price.trim() !== '' && comparePrice.trim() !== '';
+  const offerPct = bothPrices ? discountPercent(Number(price), Number(comparePrice)) : null;
+  const offerInvalid = bothPrices && Number(comparePrice) <= Number(price);
+
   return (
-    <form onSubmit={submit} style={{ maxWidth: 620 }}>
-      {error && <div className="msg-err">{error}</div>}
-      {ok && <div className="msg-ok">{ok}</div>}
+    <form onSubmit={submit} className="pform">
+      <div className="pform-grid">
+        <div className="pform-main">
+          <section className="adm-card">
+            <h2 className="card-t">Datos del producto</h2>
+            <div className="fld">
+              <label htmlFor="name">Nombre</label>
+              <input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="fld">
+              <label htmlFor="description">Descripción</label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <span className="hint">Opcional. Material, medidas, para qué sirve.</span>
+            </div>
+          </section>
 
-      <div className="fld">
-        <label htmlFor="name">Nombre</label>
-        <input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
+          <section className="adm-card">
+            <h2 className="card-t">Precio</h2>
+            <div className="fld-row">
+              <div className="fld">
+                <label htmlFor="price">Precio</label>
+                <div className="in-pre">
+                  <span>$</span>
+                  <input
+                    id="price"
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    required
+                  />
+                </div>
+                <span className="hint">En pesos, sin centavos.</span>
+              </div>
+              <div className="fld">
+                <label htmlFor="compare-price">Precio anterior</label>
+                <div className="in-pre">
+                  <span>$</span>
+                  <input
+                    id="compare-price"
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={comparePrice}
+                    onChange={(e) => setComparePrice(e.target.value)}
+                    placeholder="Opcional"
+                  />
+                </div>
+                {offerInvalid ? (
+                  <span className="hint warn">Tiene que ser mayor que el precio.</span>
+                ) : offerPct !== null ? (
+                  <span className="hint">{`Se muestra tachado, con la etiqueta -${offerPct}%.`}</span>
+                ) : (
+                  <span className="hint">Solo si está en oferta: se muestra tachado.</span>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="adm-card">
+            <h2 className="card-t">Fotos</h2>
+            <div className="fld">
+              {shots.length > 0 && (
+                <div className="photos-grid">
+                  {shots.map((shot, i) => (
+                    <div className="photo-card" key={shot.key}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={shot.src} alt="" />
+                      {i === 0 && <span className="cover-tag">Portada</span>}
+                      <button
+                        type="button"
+                        className="del"
+                        onClick={() => removeShot(i)}
+                        disabled={photosBusy}
+                        aria-label="Quitar foto"
+                      >
+                        <IconClose />
+                      </button>
+                      {shots.length > 1 && (
+                        <span className="move">
+                          <button
+                            type="button"
+                            onClick={() => moveShot(i, i - 1)}
+                            disabled={i === 0 || reordering || photosBusy}
+                            aria-label="Mover a la izquierda"
+                          >
+                            <IconChevronLeft />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveShot(i, i + 1)}
+                            disabled={i === shots.length - 1 || reordering || photosBusy}
+                            aria-label="Mover a la derecha"
+                          >
+                            <IconChevronRight />
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label
+                className={`dropzone${dragOver ? ' over' : ''}${photosBusy ? ' busy' : ''}`}
+                htmlFor="photos"
+                onDragOver={onDragOver}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onDrop}
+              >
+                <IconUpload />
+                <span>
+                  {photosBusy ? (
+                    'Subiendo fotos…'
+                  ) : (
+                    <>
+                      <strong>Arrastrá las fotos acá</strong> o tocá para elegirlas
+                    </>
+                  )}
+                </span>
+                <input
+                  ref={fileRef}
+                  id="photos"
+                  type="file"
+                  accept={PHOTO_TYPES.join(',')}
+                  multiple
+                  hidden
+                  disabled={photosBusy}
+                  onChange={(e) => addFiles(e.target.files)}
+                />
+              </label>
+              <span className="hint">
+                JPG, PNG, WebP o AVIF, hasta 8 MB cada una; se achican y optimizan solas. La
+                primera es la portada: usá las flechas para ordenarlas.
+                {isNew && ' Se suben al crear el producto.'}
+              </span>
+            </div>
+          </section>
+        </div>
+
+        <aside className="pform-side">
+          <section className="adm-card">
+            <h2 className="card-t">Visibilidad</h2>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={visible}
+                onChange={(e) => setVisible(e.target.checked)}
+              />
+              Visible en el catálogo
+            </label>
+            <p className="card-note">
+              Si lo desmarcás queda guardado, pero los clientes no lo ven.
+            </p>
+          </section>
+
+          <section className="adm-card">
+            <h2 className="card-t">Categoría</h2>
+            <div className="fld">
+              <CategoryPicker
+                id="category"
+                categories={categories}
+                value={categoryId ? Number(categoryId) : null}
+                onChange={(id) => setCategoryId(id ? String(id) : '')}
+                onCreate={createCategory}
+              />
+              <span className="hint">Escribí para buscar; si no existe, la creás desde acá.</span>
+            </div>
+          </section>
+
+          <section className="adm-card">
+            <h2 className="card-t">Stock</h2>
+            <div className="fld">
+              <label htmlFor="stock">Unidades disponibles</label>
+              <input
+                id="stock"
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                placeholder="Sin control"
+              />
+              <span className="hint">
+                Vacío = no se controla. Con 0 figura “Sin stock”; con 3 o menos, “Últimas
+                unidades”.
+              </span>
+            </div>
+          </section>
+        </aside>
       </div>
 
-      <div className="fld-row">
-        <div className="fld">
-          <label htmlFor="price">Precio (pesos, sin centavos)</label>
-          <input
-            id="price"
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            required
-          />
-        </div>
-        <div className="fld">
-          <label htmlFor="compare-price">Precio anterior (si está en oferta)</label>
-          <input
-            id="compare-price"
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            value={comparePrice}
-            onChange={(e) => setComparePrice(e.target.value)}
-            placeholder="Opcional"
-          />
-          <span className="hint">Se muestra tachado, con el porcentaje de descuento.</span>
-        </div>
-      </div>
-
-      <div className="fld-row">
-        <div className="fld">
-          <label htmlFor="category">Categoría</label>
-          <select
-            id="category"
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-          >
-            <option value="">Sin categoría</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="fld">
-          <label htmlFor="stock">Stock</label>
-          <input
-            id="stock"
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-            placeholder="Sin control"
-          />
-          <span className="hint">
-            Dejar vacío si no se controla. Con 0 aparece como “Sin stock”; con 3 o menos,
-            “Quedan pocas”.
-          </span>
-        </div>
-      </div>
-
-      <div className="fld">
-        <label htmlFor="new-category">Crear categoría nueva</label>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <input
-            id="new-category"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            placeholder="Ej: Electrodomésticos"
-          />
-          <button type="button" className="btn-sm gray" onClick={addCategory}>
-            Agregar
+      {/* Barra fija abajo: el botón de guardar y los avisos siempre a la vista */}
+      <div className="pform-bar">
+        {error && <div className="msg-err">{error}</div>}
+        {ok && <div className="msg-ok">{ok}</div>}
+        <div className="pform-actions">
+          <button type="button" className="btn-sm gray" onClick={() => router.push('/admin')}>
+            Volver
+          </button>
+          <button className="btn-sm" type="submit" disabled={busy}>
+            {busy ? busyLabel : isNew ? 'Crear producto' : 'Guardar cambios'}
           </button>
         </div>
-      </div>
-
-      <div className="fld">
-        <label htmlFor="description">Descripción</label>
-        <textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
-
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={visible}
-          onChange={(e) => setVisible(e.target.checked)}
-        />
-        Visible en el catálogo
-      </label>
-
-      {product ? (
-        <div className="fld">
-          <label>Fotos</label>
-          {photos.length > 0 && (
-            <div className="photos-grid">
-              {photos.map((ph, i) => (
-                <div className="photo-card" key={ph.id}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={thumbUrl(ph.filename)} alt="" />
-                  {i === 0 && <span className="cover-tag">Portada</span>}
-                  <button
-                    type="button"
-                    className="del"
-                    onClick={() => removePhoto(ph)}
-                    aria-label="Quitar foto"
-                  >
-                    <IconClose />
-                  </button>
-                  {photos.length > 1 && (
-                    <span className="move">
-                      <button
-                        type="button"
-                        onClick={() => movePhoto(i, i - 1)}
-                        disabled={i === 0 || reordering}
-                        aria-label="Mover a la izquierda"
-                      >
-                        <IconChevronLeft />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => movePhoto(i, i + 1)}
-                        disabled={i === photos.length - 1 || reordering}
-                        aria-label="Mover a la derecha"
-                      >
-                        <IconChevronRight />
-                      </button>
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <label
-            className={`dropzone${dragOver ? ' over' : ''}${uploading ? ' busy' : ''}`}
-            htmlFor="photos"
-            onDragOver={onDragOver}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-          >
-            <IconUpload />
-            <span>
-              {uploading ? (
-                'Subiendo fotos…'
-              ) : (
-                <>
-                  <strong>Arrastrá las fotos acá</strong> o tocá para elegirlas
-                </>
-              )}
-            </span>
-            <input
-              ref={fileRef}
-              id="photos"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif"
-              multiple
-              hidden
-              disabled={uploading}
-              onChange={(e) => uploadPhotos(e.target.files)}
-            />
-          </label>
-          <span className="hint">
-            JPG, PNG, WebP o AVIF, hasta 8 MB cada una; se achican y optimizan solas. La
-            primera es la portada: usá las flechas para ordenarlas.
-          </span>
-        </div>
-      ) : (
-        <p className="fld hint" style={{ color: 'var(--soft)', fontSize: '0.85rem' }}>
-          Las fotos se cargan en el paso siguiente, después de guardar el producto.
-        </p>
-      )}
-
-      <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-        <button className="btn-sm" type="submit" disabled={busy}>
-          {busy ? 'Guardando…' : isNew ? 'Crear producto' : 'Guardar cambios'}
-        </button>
-        <button
-          type="button"
-          className="btn-sm gray"
-          onClick={() => router.push('/admin')}
-        >
-          Volver
-        </button>
       </div>
     </form>
   );

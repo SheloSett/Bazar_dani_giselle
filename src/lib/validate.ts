@@ -41,3 +41,56 @@ export function parseStock(value: unknown): { value: number | null } | null {
   const n = Number(s);
   return n <= PG_INT_MAX ? { value: n } : null;
 }
+
+export const CATEGORY_NAME_MAX = 60;
+
+// Nombre de categoría: sin espacios de más, de 1 a 60 caracteres, o null
+export function parseCategoryName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const name = value.trim().replace(/\s+/g, ' ');
+  return name && name.length <= CATEGORY_NAME_MAX ? name : null;
+}
+
+// ---------- pedidos (ruta pública: todo lo que llega se valida) ----------
+
+// Código del link de un pedido: lo genera el navegador, 12 bytes al azar en base64url
+export const ORDER_TOKEN_RE = /^[A-Za-z0-9_-]{16,40}$/;
+export const MAX_ORDER_ITEMS = 100;
+export const MAX_ITEM_QUANTITY = 9999;
+
+// Ítems de un pedido: [{ id, quantity }] → lista sin productos repetidos (se suman
+// las cantidades), o null si algo no es válido. Los precios no vienen de acá:
+// los pone el servidor.
+export function parseOrderItems(value: unknown): { id: number; quantity: number }[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ORDER_ITEMS) return null;
+  const byId = new Map<number, number>();
+  for (const raw of value) {
+    const item = raw as { id?: unknown; quantity?: unknown } | null;
+    const id = parseId(item?.id);
+    const quantity = item?.quantity;
+    if (id === null || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1)
+      return null;
+    const sum = (byId.get(id) ?? 0) + quantity;
+    if (sum > MAX_ITEM_QUANTITY) return null;
+    byId.set(id, sum);
+  }
+  return [...byId].map(([id, quantity]) => ({ id, quantity }));
+}
+
+export const CUSTOMER_NAME_MAX = 80;
+
+// Nombre de quien pide: sin espacios de más, de 2 a 80 caracteres, o null
+export function parseCustomerName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const name = value.trim().replace(/\s+/g, ' ');
+  return name.length >= 2 && name.length <= CUSTOMER_NAME_MAX ? name : null;
+}
+
+// Teléfono de quien pide: se puede escribir con espacios, guiones, paréntesis o +.
+// Devuelve solo los dígitos (de 8 a 15), o null si no parece un teléfono.
+export function parsePhone(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 40) return null;
+  if (!/^[\d\s()+.-]+$/.test(value)) return null;
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 8 && digits.length <= 15 ? digits : null;
+}

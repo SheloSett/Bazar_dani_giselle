@@ -28,6 +28,8 @@ src/app/admin/         panel: login, productos, fotos, ajustes
 src/app/api/admin/     API del panel (login, CRUD, uploads)
 src/app/uploads/[...file]/   sirve las fotos subidas y sus miniaturas
 src/app/og/[name]/     imagen JPEG para la vista previa al compartir el link
+src/app/api/orders/    guarda el pedido al tocar "Enviar por WhatsApp" (ruta pública, con límites)
+src/app/pedido/[token]/      detalle del pedido con fotos: el link que va en el mensaje
 test/                  tests (npm test)
 ```
 
@@ -49,6 +51,29 @@ Al compartir la URL por WhatsApp, Instagram, etc. aparece una vista previa con e
 nombre del negocio, el título y la primera foto del catálogo (servida en JPEG desde
 `/og/…`, porque WhatsApp no muestra WebP). Si el sitio está detrás de un proxy que
 no manda `X-Forwarded-Host`/`X-Forwarded-Proto`, configurar `SITE_URL` en el `.env`.
+
+## Pedidos
+
+WhatsApp no deja adjuntar fotos desde un link, así que el mensaje del pedido lleva un
+link al detalle: `…/pedido/<código>`. Al tocar "Enviar pedido por WhatsApp" el sitio
+guarda el pedido (tablas `orders` y `order_items`) y esa página lo muestra con la foto
+de cada producto, cantidades y total, con un botón para imprimirlo o guardarlo en PDF.
+
+Para pedir hay que dejar **nombre y teléfono** (obligatorios: sin eso no se envía, y
+el servidor también los exige). Todos los pedidos quedan en el panel, en **Pedidos**:
+lista con cliente, teléfono y total, y un detalle con fotos, botón para escribirle al
+cliente por WhatsApp, imprimir o eliminar.
+
+- El código del link es aleatorio: solo lo ve quien tiene el mensaje. No se indexa.
+- El nombre y el teléfono del cliente se ven solo en el panel; la página del link no
+  los muestra.
+- Se guarda nombre, precio y foto de cada producto como estaban al pedir; si el
+  producto cambia después, el pedido no. Los precios los pone el servidor.
+- El pedido se guarda al tocar el botón: si la persona después no manda el mensaje,
+  queda igual en la lista. No descuenta stock: sigue siendo un pedido a confirmar.
+- Si el guardado falla, el catálogo avisa y el mensaje igual lleva el detalle en texto.
+- Límites de la ruta pública: cuerpo de 20 KB, 100 productos, 12 pedidos por IP y 240
+  en total cada 10 minutos.
 
 ## Desarrollo local
 

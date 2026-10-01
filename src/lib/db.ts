@@ -18,6 +18,11 @@ export function isForeignKeyViolation(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === '23503';
 }
 
+// Error de Postgres por valor repetido en una columna UNIQUE (ej: nombre de categoría)
+export function isUniqueViolation(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === '23505';
+}
+
 export async function query<T = unknown>(
   text: string,
   params: unknown[] = []

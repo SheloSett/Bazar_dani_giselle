@@ -6,6 +6,8 @@ export interface Category {
   id: number;
   name: string;
   position: number;
+  // Foto propia del rubro en el catálogo; null = se usa la del primer producto
+  photo: string | null;
 }
 
 export interface PublicProduct {
@@ -84,10 +86,10 @@ export async function updateSettings(entries: Partial<Settings>): Promise<void> 
 
 // ---------- categorías ----------
 
+const CATEGORY_COLS = 'id, name, position, photo';
+
 export async function listCategories(): Promise<Category[]> {
-  return query<Category>(
-    'SELECT id, name, position FROM categories ORDER BY position, name'
-  );
+  return query<Category>(`SELECT ${CATEGORY_COLS} FROM categories ORDER BY position, name`);
 }
 
 export async function createCategory(name: string): Promise<Category> {
@@ -95,14 +97,44 @@ export async function createCategory(name: string): Promise<Category> {
     `INSERT INTO categories (name, position)
      VALUES ($1, COALESCE((SELECT MAX(position) + 1 FROM categories), 1))
      ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-     RETURNING id, name, position`,
+     RETURNING ${CATEGORY_COLS}`,
     [name.trim()]
   );
   return rows[0];
 }
 
-export async function deleteCategory(id: number): Promise<void> {
-  await query('DELETE FROM categories WHERE id = $1', [id]);
+// null si no existe. Un nombre repetido tira el error UNIQUE de Postgres (isUniqueViolation).
+export async function renameCategory(id: number, name: string): Promise<Category | null> {
+  const rows = await query<Category>(
+    `UPDATE categories SET name = $2 WHERE id = $1 RETURNING ${CATEGORY_COLS}`,
+    [id, name]
+  );
+  return rows[0] ?? null;
+}
+
+// Cambia (o quita, con null) la foto. Devuelve también la anterior, para borrar el archivo.
+export async function setCategoryPhoto(
+  id: number,
+  photo: string | null
+): Promise<{ category: Category; oldPhoto: string | null } | null> {
+  const rows = await query<Category & { old_photo: string | null }>(
+    `WITH old AS (SELECT photo FROM categories WHERE id = $1)
+     UPDATE categories SET photo = $2 WHERE id = $1
+     RETURNING ${CATEGORY_COLS}, (SELECT photo FROM old) AS old_photo`,
+    [id, photo]
+  );
+  if (!rows[0]) return null;
+  const { old_photo, ...category } = rows[0];
+  return { category, oldPhoto: old_photo };
+}
+
+// Devuelve la foto que tenía (para borrar el archivo), o null
+export async function deleteCategory(id: number): Promise<string | null> {
+  const rows = await query<{ photo: string | null }>(
+    'DELETE FROM categories WHERE id = $1 RETURNING photo',
+    [id]
+  );
+  return rows[0]?.photo ?? null;
 }
 
 // ---------- productos ----------
