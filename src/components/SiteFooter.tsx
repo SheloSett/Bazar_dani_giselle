@@ -1,7 +1,16 @@
 'use client';
 
 import type { Settings } from '@/lib/data';
-import { IconWhatsApp } from '@/components/icons';
+import { IconInstagram, IconWhatsApp } from '@/components/icons';
+
+// Créditos del desarrollador en el pie, como en los otros sitios (Shiraf,
+// IGWT Store, Manhattan). El mail va en minúscula; Gmail ignora las mayúsculas.
+const DEV_CREDIT = {
+  name: 'SheloSettDev',
+  instagramUrl: 'https://instagram.com/shelosettdev',
+  email: 'shelosettdev@gmail.com',
+  whatsapp: '5491136557290', // solo dígitos con código de país, formato wa.me
+} as const;
 
 export function SiteFooter({
   settings,
@@ -47,9 +56,25 @@ export function SiteFooter({
           )}
         </div>
       </div>
-      <p className="foot-bottom">
-        © {new Date().getFullYear()} {settings.shop_name}
-      </p>
+      {/* antes era un <p className="foot-bottom"> con solo el ©: pasa a <div>
+          para sumarle la línea de créditos del desarrollador */}
+      <div className="foot-bottom">
+        <p>
+          © {new Date().getFullYear()} {settings.shop_name}
+        </p>
+        <p className="foot-credit">
+          <span>Desarrollado por</span>
+          <a href={DEV_CREDIT.instagramUrl} target="_blank" rel="noopener">
+            <IconInstagram /> {DEV_CREDIT.name}
+          </a>
+          <span aria-hidden="true">·</span>
+          <a href={`mailto:${DEV_CREDIT.email}`}>{DEV_CREDIT.email}</a>
+          <span aria-hidden="true">·</span>
+          <a href={`https://wa.me/${DEV_CREDIT.whatsapp}`} target="_blank" rel="noopener">
+            <IconWhatsApp /> WhatsApp
+          </a>
+        </p>
+      </div>
     </footer>
   );
 }

@@ -67,6 +67,17 @@ export function IconChevronRight() {
   );
 }
 
+export function IconInstagram() {
+  return (
+    <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" />
+      <circle cx="12" cy="12" r="4" />
+      {/* el punto de la cámara va relleno: con trazo solo no se ve a este tamaño */}
+      <circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function IconChevronUp() {
   return (
     <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
