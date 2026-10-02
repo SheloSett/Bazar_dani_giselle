@@ -6,7 +6,7 @@ import type { AdminProduct, Category } from '@/lib/data';
 import { thumbUrl } from '@/lib/catalog';
 import { CATEGORY_NAME_MAX } from '@/lib/validate';
 import { ProductTable } from '@/components/admin/ProductTable';
-import { IconPhoto } from '@/components/icons';
+import { IconChevronDown, IconChevronUp, IconPhoto } from '@/components/icons';
 import { FitPhoto } from '@/components/FitPhoto';
 
 const count = (n: number) => `${n} ${n === 1 ? 'producto' : 'productos'}`;
@@ -188,6 +188,28 @@ export function CategoryManager({
     router.refresh(); // la tabla de productos muestra el nombre nuevo
   };
 
+  // Mueve el rubro un lugar arriba o abajo: cambia el orden de los rubros en el
+  // catálogo (tiles y pestañas) y el de sus productos en la grilla
+  const moveCat = async (c: Category, dir: -1 | 1) => {
+    const i = cats.findIndex((x) => x.id === c.id);
+    const j = i + dir;
+    if (j < 0 || j >= cats.length) return;
+    const order = cats.map((x) => x.id);
+    [order[i], order[j]] = [order[j], order[i]];
+    setError('');
+    setBusy(c.id);
+    const res = await fetch('/api/admin/categories', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    });
+    const data = await res.json().catch(() => null);
+    setBusy(null);
+    if (!res.ok) return setError(data?.error || 'No se pudo cambiar el orden');
+    setCats(data); // la API devuelve las categorías ya en el orden nuevo
+    router.refresh(); // el catálogo y la tabla de productos siguen este orden
+  };
+
   const remove = async (c: Category) => {
     const n = inCategory(c.id).length;
     const msg = n
@@ -213,8 +235,9 @@ export function CategoryManager({
       </div>
       <p className="section-note">
         Son los rubros del catálogo. La foto es la que se ve en cada rubro; si no le cargás
-        una, se usa la del primer producto (figura como “Automática”). Borrar una categoría
-        no borra sus productos: quedan sin categoría.
+        una, se usa la del primer producto (figura como “Automática”). Con las flechas los
+        ordenás como se ven en el catálogo. Borrar una categoría no borra sus productos:
+        quedan sin categoría.
       </p>
       {error && <p className="msg-err">{error}</p>}
 
@@ -265,7 +288,8 @@ export function CategoryManager({
 
       <ul className="cat-list">
         {cats.length === 0 && <li className="empty">Todavía no hay categorías.</li>}
-        {cats.map((c) => {
+        {/* idx: para apagar la flecha de subir en el primero y la de bajar en el último */}
+        {cats.map((c, idx) => {
           const list = inCategory(c.id);
           return (
             <li key={c.id} className="cat-item">
@@ -298,6 +322,26 @@ export function CategoryManager({
                       <strong>{c.name}</strong>
                       <span className="cat-n">{count(list.length)}</span>
                       <div className="cat-actions">
+                        <span className="mv mv-row">
+                          <button
+                            type="button"
+                            onClick={() => moveCat(c, -1)}
+                            disabled={busy !== null || idx === 0}
+                            title="Subir en el orden del catálogo"
+                            aria-label={`Subir ${c.name}`}
+                          >
+                            <IconChevronUp />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveCat(c, 1)}
+                            disabled={busy !== null || idx === cats.length - 1}
+                            title="Bajar en el orden del catálogo"
+                            aria-label={`Bajar ${c.name}`}
+                          >
+                            <IconChevronDown />
+                          </button>
+                        </span>
                         <button className="btn-sm gray" type="button" onClick={() => startEdit(c)}>
                           Renombrar
                         </button>

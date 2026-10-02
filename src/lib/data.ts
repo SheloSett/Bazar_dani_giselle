@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { sameIdSet } from '@/lib/validate';
 
 // ---------- tipos ----------
 
@@ -128,6 +129,21 @@ export async function setCategoryPhoto(
   return { category, oldPhoto: old_photo };
 }
 
+// Nuevo orden de los rubros del catálogo (y de sus pestañas). Devuelve false
+// si los ids no son exactamente todas las categorías.
+export async function reorderCategories(ids: number[]): Promise<boolean> {
+  const current = await query<{ id: number }>('SELECT id FROM categories');
+  if (!sameIdSet(current.map((c) => c.id), ids)) return false;
+  // Una sola sentencia: o cambia todo el orden o no cambia nada
+  await query(
+    `UPDATE categories c SET position = v.pos
+     FROM unnest($1::int[], $2::int[]) AS v(id, pos)
+     WHERE c.id = v.id`,
+    [ids, ids.map((_, i) => i + 1)]
+  );
+  return true;
+}
+
 // Devuelve la foto que tenía (para borrar el archivo), o null
 export async function deleteCategory(id: number): Promise<string | null> {
   const rows = await query<{ photo: string | null }>(
@@ -243,6 +259,39 @@ export async function updateProduct(
     `UPDATE products SET ${sets.join(', ')} WHERE id = $${params.length}`,
     params
   );
+}
+
+// Nuevo orden de los productos de UN rubro (o de los que no tienen rubro). El
+// catálogo ordena primero por categoría y después por posición, así que acá
+// alcanza con renumerar los del rubro: el resto no se toca. Devuelve false si
+// los ids no son exactamente todos los productos de un mismo rubro.
+export async function reorderProducts(ids: number[]): Promise<boolean> {
+  if (!ids.length) return false;
+  const rows = await query<{ id: number; category_id: number | null }>(
+    'SELECT id, category_id FROM products WHERE id = ANY($1::int[])',
+    [ids]
+  );
+  // Si falta alguno (o hay repetidos), las cantidades no coinciden
+  if (rows.length !== ids.length) return false;
+  const categoryId = rows[0].category_id;
+  if (rows.some((r) => r.category_id !== categoryId)) return false;
+
+  const siblings = await query<{ id: number }>(
+    categoryId === null
+      ? 'SELECT id FROM products WHERE category_id IS NULL'
+      : 'SELECT id FROM products WHERE category_id = $1',
+    categoryId === null ? [] : [categoryId]
+  );
+  if (!sameIdSet(siblings.map((s) => s.id), ids)) return false;
+
+  // Una sola sentencia: o cambia todo el orden o no cambia nada
+  await query(
+    `UPDATE products p SET position = v.pos
+     FROM unnest($1::int[], $2::int[]) AS v(id, pos)
+     WHERE p.id = v.id`,
+    [ids, ids.map((_, i) => i + 1)]
+  );
+  return true;
 }
 
 export async function deleteProduct(id: number): Promise<string[]> {

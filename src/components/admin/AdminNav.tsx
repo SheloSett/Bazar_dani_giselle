@@ -7,6 +7,7 @@ import {
   IconBox,
   IconExternal,
   IconLogout,
+  IconPrint,
   IconSliders,
   IconTag,
 } from '@/components/icons';
@@ -43,6 +44,9 @@ export function AdminNav() {
       </div>
       <div className="side-foot">
         {/* en el celular quedan solo los íconos: el texto se oculta pero se sigue leyendo */}
+        <Link href="/imprimir" target="_blank" rel="noopener" title="Catálogo para imprimir o guardar en PDF">
+          <IconPrint /> <span className="side-label">Catálogo en PDF</span>
+        </Link>
         <Link href="/" target="_blank" rel="noopener" title="Ver catálogo">
           <IconExternal /> <span className="side-label">Ver catálogo</span>
         </Link>

@@ -5,11 +5,13 @@ import {
   parseCategoryName,
   parseCustomerName,
   parseId,
+  parseIdList,
   parseOptionalPrice,
   parseOrderItems,
   parsePhone,
   parsePrice,
   parseStock,
+  sameIdSet,
 } from '@/lib/validate';
 
 describe('parseId', () => {
@@ -138,5 +140,27 @@ describe('datos de quien pide', () => {
   test('teléfono: rechaza lo que no es un teléfono', () => {
     for (const v of ['', '1234567', 'no tengo', '11 4066 2350 int 3', '1'.repeat(16), ' '.repeat(50), 1140662350, null, undefined])
       assert.equal(parsePhone(v), null, String(v));
+  });
+});
+
+describe('reordenamiento (orden manual)', () => {
+  test('parseIdList: lista de ids válidos, tal como llegó', () => {
+    assert.deepEqual(parseIdList([3, 1, 2]), [3, 1, 2]);
+    assert.deepEqual(parseIdList(['5', 7]), [5, 7]);
+  });
+
+  test('parseIdList: rechaza vacíos, enormes o con ids inválidos', () => {
+    for (const v of [[], [0], [1, 'abc'], [1, null], [1.5], 'nope', null, undefined, {}])
+      assert.equal(parseIdList(v), null, JSON.stringify(v));
+    assert.equal(parseIdList(Array.from({ length: 1001 }, (_, i) => i + 1)), null);
+  });
+
+  test('sameIdSet: mismos ids en cualquier orden, sin agregar ni sacar', () => {
+    assert.equal(sameIdSet([1, 2, 3], [3, 1, 2]), true);
+    assert.equal(sameIdSet([], []), true);
+    assert.equal(sameIdSet([1, 2], [1, 2, 3]), false); // agrega
+    assert.equal(sameIdSet([1, 2, 3], [1, 2]), false); // saca
+    assert.equal(sameIdSet([1, 2], [1, 1]), false); // repite
+    assert.equal(sameIdSet([1, 2], [1, 3]), false); // cambia
   });
 });

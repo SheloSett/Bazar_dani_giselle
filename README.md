@@ -20,6 +20,7 @@ db/schema.sql          esquema (idempotente)
 db/seed.sql            datos de ejemplo (solo en una base nueva)
 scripts/migrate.mjs    aplica schema + seed; corre al arrancar el contenedor
 scripts/reset-password.mjs   vuelve a la clave inicial del .env si se olvidó la del panel
+scripts/backup.sh      backup de la base y las fotos (correrlo por cron en el VPS)
 src/middleware.ts      protege /admin con la cookie de sesión
 src/lib/               db, auth, clave del admin, límite de intentos, queries, validación, uploads
 src/app/page.tsx       catálogo público (server component)
@@ -30,6 +31,7 @@ src/app/uploads/[...file]/   sirve las fotos subidas y sus miniaturas
 src/app/og/[name]/     imagen JPEG para la vista previa al compartir el link
 src/app/api/orders/    guarda el pedido al tocar "Enviar por WhatsApp" (ruta pública, con límites)
 src/app/pedido/[token]/      detalle del pedido con fotos: el link que va en el mensaje
+src/app/imprimir/      catálogo entero para imprimir o guardar en PDF
 test/                  tests (npm test)
 ```
 
@@ -44,6 +46,21 @@ Además de nombre, precio, categoría y fotos, cada producto tiene dos campos op
   unidades. El pedido nunca supera las unidades disponibles.
 
 La búsqueda ignora tildes y mayúsculas ("cafe" encuentra "Cafetera").
+
+### Orden del catálogo
+
+El catálogo muestra los rubros y los productos en el orden del panel. Las flechas
+⬆/⬇ de **Categorías** ordenan los rubros (tiles y pestañas), y las de la tabla de
+**Productos** mueven cada producto dentro de su rubro. Los productos sin stock van
+igual al final de su rubro.
+
+## Catálogo en PDF
+
+Desde el panel, **Catálogo en PDF** abre `/imprimir`: el catálogo entero (solo los
+productos visibles) en una página pensada para papel, agrupado por rubro con foto,
+precio, oferta y descripción. Con "Imprimir o guardar PDF" el navegador lo imprime
+o lo guarda como PDF, listo para mandar por WhatsApp. Lleva la fecha del día: los
+precios son los del momento en que se genera.
 
 ## Compartir el link
 
@@ -135,6 +152,24 @@ El login del panel admite 5 intentos fallidos por IP y 30 en total cada
 docker compose run --rm -u root app chown -R node:node /app/uploads
 ```
 
+### Backups
+
+`scripts/backup.sh` guarda la base (`pg_dump`) y las fotos (`uploads/`) en
+`backups/`, y borra lo que tenga más de 14 días (`BACKUP_KEEP_DAYS` lo cambia).
+Para que corra solo todas las noches, en el VPS (`crontab -e`):
+
+```
+0 4 * * * cd /srv/bazar-catalogo && ./scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+Conviene bajarse la carpeta `backups/` cada tanto (o copiarla a otro lado), por si
+se pierde el VPS entero. Para restaurar:
+
+```bash
+gunzip -c backups/db-FECHA.sql.gz | docker compose exec -T db psql -U bazar bazar
+docker compose exec -T app tar -xzf - -C /app < backups/uploads-FECHA.tgz
+```
+
 ### Cuando haya dominio (Caddy)
 
 ```
@@ -149,6 +184,10 @@ La cookie de sesión se marca `secure` sola cuando el pedido llega por HTTPS
 
 ## Mejoras pendientes
 
-- Exportar catálogo en PDF desde los mismos datos
-- Orden manual de productos y categorías (campo `position` ya existe)
-- Backup automático de la base (`pg_dump`) y de `uploads/`
+<!-- Hechas el 2026-10-02 (quedan comentadas como registro, no borradas):
+- Exportar catálogo en PDF desde los mismos datos → página /imprimir, link "Catálogo en PDF" en el panel
+- Orden manual de productos y categorías (campo `position` ya existe) → flechas en Productos y Categorías
+- Backup automático de la base (`pg_dump`) y de `uploads/` → scripts/backup.sh + cron
+-->
+
+Por ahora no queda ninguna pendiente.

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/session';
-import { createProduct, listAdminProducts } from '@/lib/data';
+import { createProduct, listAdminProducts, reorderProducts } from '@/lib/data';
 import { isForeignKeyViolation } from '@/lib/db';
-import { parseId, parseOptionalPrice, parsePrice, parseStock } from '@/lib/validate';
+import {
+  parseId,
+  parseIdList,
+  parseOptionalPrice,
+  parsePrice,
+  parseStock,
+} from '@/lib/validate';
 
 export async function GET() {
   if (!(await isAdmin()))
@@ -56,4 +62,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'La categoría no existe' }, { status: 400 });
     throw err;
   }
+}
+
+// Nuevo orden de los productos de un rubro: { order: [ids…] }. Tienen que ser
+// exactamente todos los productos de un mismo rubro (o todos los sin rubro).
+export async function PATCH(req: NextRequest) {
+  if (!(await isAdmin()))
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+  const body = await req.json().catch(() => null);
+  const order = parseIdList(body?.order);
+  if (!order) return NextResponse.json({ error: 'Orden inválido' }, { status: 400 });
+
+  if (!(await reorderProducts(order)))
+    return NextResponse.json(
+      { error: 'El orden no coincide con los productos del rubro' },
+      { status: 400 }
+    );
+
+  return NextResponse.json({ ok: true });
 }

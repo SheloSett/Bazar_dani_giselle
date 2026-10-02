@@ -67,6 +67,32 @@ export function IconChevronRight() {
   );
 }
 
+export function IconChevronUp() {
+  return (
+    <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 14.5l6-6 6 6" />
+    </svg>
+  );
+}
+
+export function IconChevronDown() {
+  return (
+    <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 9.5l6 6 6-6" />
+    </svg>
+  );
+}
+
+export function IconPrint() {
+  return (
+    <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 8V3.5h10V8" />
+      <path d="M7 16.5H4.5A1.5 1.5 0 0 1 3 15V9.5A1.5 1.5 0 0 1 4.5 8h15A1.5 1.5 0 0 1 21 9.5V15a1.5 1.5 0 0 1-1.5 1.5H17" />
+      <path d="M7 13.5h10v7H7z" />
+    </svg>
+  );
+}
+
 export function IconTruck() {
   return (
     <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">

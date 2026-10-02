@@ -854,3 +854,72 @@ img { max-width: 100%; }
 .login-card { width: 100%; max-width: 360px; }
 .login-card h1 { font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
 .login-card p { color: var(--soft); margin: 0 0 20px; font-size: 0.92rem; }
+
+/* ---------- flechas para ordenar (productos y categorías del panel) ---------- */
+.mv { display: inline-flex; flex-direction: column; gap: 3px; }
+.mv.mv-row { flex-direction: row; gap: 4px; }
+.mv button {
+  width: 26px; height: 22px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 7px;
+  background: #fff; color: var(--soft);
+}
+.mv.mv-row button { width: 30px; height: 28px; }
+.mv button:hover:not(:disabled) {
+  color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft);
+}
+.mv button:disabled { opacity: 0.3; cursor: default; }
+.mv .ic { width: 0.95em; height: 0.95em; vertical-align: 0; }
+.tbl .mv-cell { padding-right: 2px; }
+
+/* ---------- catálogo para imprimir o guardar en PDF (/imprimir) ---------- */
+.pr { max-width: 960px; margin: 0 auto; padding: 22px 20px 50px; }
+.pr-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
+.pr-head { margin-bottom: 8px; }
+.pr-head h1 { font-weight: 800; letter-spacing: -0.02em; font-size: 2rem; margin: 0; line-height: 1.15; }
+.pr-tag { margin: 4px 0 0; color: var(--soft); }
+.pr-meta { margin: 6px 0 0; color: var(--soft); font-size: 0.88rem; }
+.pr-cat { margin-top: 26px; }
+.pr-cat h2 {
+  font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em;
+  margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--accent);
+}
+.pr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.pr-card {
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  break-inside: avoid; page-break-inside: avoid; display: flex; flex-direction: column;
+}
+.pr-ph { aspect-ratio: 4 / 3; background: var(--tile); display: grid; place-items: center; }
+.pr-ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pr-ph .placeholder { width: 34%; height: 34%; color: #b9c6bd; }
+.pr-info { padding: 10px 12px 12px; }
+.pr-info strong { display: block; font-weight: 700; line-height: 1.3; }
+.pr-price {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.pr-price s { color: var(--soft); font-weight: 500; font-size: 0.86em; }
+.pr-price em {
+  font-style: normal; background: var(--accent-soft); color: var(--accent);
+  border-radius: 6px; font-size: 0.72em; font-weight: 800; padding: 1px 6px;
+}
+.pr-out { display: block; color: #a3271f; font-size: 0.8rem; font-weight: 600; margin-top: 2px; }
+.pr-info p {
+  margin: 4px 0 0; color: var(--soft); font-size: 0.84rem; line-height: 1.45;
+  /* hasta 3 líneas de descripción: el PDF es un resumen, el detalle vive en la web */
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pr-foot {
+  margin-top: 30px; padding-top: 12px; border-top: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  color: var(--soft); font-size: 0.86rem;
+}
+@media (max-width: 640px) {
+  .pr-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media print {
+  .pr { max-width: none; padding: 0; }
+  .pr-grid { gap: 10px; }
+  .pr-card { border-color: #d7d7d7; }
+  .pr-ph { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pr-cat { margin-top: 18px; }
+}

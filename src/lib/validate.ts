@@ -94,3 +94,24 @@ export function parsePhone(value: unknown): string | null {
   const digits = value.replace(/\D/g, '');
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
 }
+
+// ---------- reordenamiento (orden manual de productos y categorías) ----------
+
+export const MAX_ORDER_IDS = 1000;
+
+// Lista de ids ({ order: [ids…] } de las rutas de reordenamiento), o null si
+// algo de la lista no es un id válido
+export function parseIdList(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ORDER_IDS) return null;
+  const ids = value.map(parseId);
+  return ids.every((n): n is number => n !== null) ? (ids as number[]) : null;
+}
+
+// ¿Las dos listas tienen exactamente los mismos ids? Así un reordenamiento no
+// puede sumar, repetir ni dejar afuera elementos: solo cambiarlos de lugar.
+export function sameIdSet(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((id, i) => id === sb[i]);
+}
