@@ -34,6 +34,9 @@ const CART_KEY = 'catalogo-cart';
 const CART_NAMES_KEY = 'catalogo-cart-nombres';
 // Nombre y teléfono de quien pide: se recuerdan en este navegador para el próximo pedido
 const CUSTOMER_KEY = 'catalogo-cliente';
+// Último código de pedido con la firma de su contenido: el mismo carrito con los
+// mismos datos reusa el mismo código, incluso después de recargar la página
+const ORDER_TOKEN_KEY = 'catalogo-pedido-token';
 
 type Cart = Record<number, number>; // product id -> cantidad
 type CartNames = Record<number, string>; // product id -> nombre
@@ -110,12 +113,28 @@ export function Catalog({
   };
 
   // Link al detalle con fotos que va en el mensaje. Cada cambio del carrito o de los
-  // datos es otro pedido, con otro código; tocar "Enviar" dos veces sin cambios
-  // reusa el mismo.
+  // datos es otro pedido, con otro código; el mismo contenido (aunque se recargue la
+  // página) reusa el mismo código: reenviar no crea un pedido repetido y el link del
+  // mensaje sigue siendo válido.
   const [orderLink, setOrderLink] = useState<{ token: string; url: string } | null>(null);
 
   useEffect(() => {
-    const token = newOrderToken();
+    // Firma del contenido: productos con cantidades + datos de quien pide
+    const sig = JSON.stringify({
+      items: Object.entries(cart)
+        .filter(([, n]) => n > 0)
+        .sort(([a], [b]) => Number(a) - Number(b)),
+      name: customer.name.trim(),
+      phone: customer.phone.trim(),
+    });
+    const saved = readStore<{ sig?: unknown; token?: unknown }>(ORDER_TOKEN_KEY);
+    // antes era siempre `const token = newOrderToken()`: generaba un código nuevo
+    // en cada carga y el mismo carrito reenviado quedaba como otro pedido
+    const token =
+      saved.sig === sig && typeof saved.token === 'string' && saved.token
+        ? saved.token
+        : newOrderToken();
+    writeStore(ORDER_TOKEN_KEY, { sig, token });
     setOrderLink({ token, url: `${window.location.origin}/pedido/${token}` });
   }, [cart, customer.name, customer.phone]);
 

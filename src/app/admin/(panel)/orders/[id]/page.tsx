@@ -6,6 +6,7 @@ import { money, thumbUrl } from '@/lib/catalog';
 import { parseId } from '@/lib/validate';
 import { IconPhoto } from '@/components/icons';
 import { PrintButton } from '@/components/PrintButton';
+import { ConfirmOrderButton } from '@/components/admin/ConfirmOrderButton';
 import { DeleteOrderButton } from '@/components/admin/DeleteOrderButton';
 import { OrderWhatsApp } from '@/components/admin/OrderWhatsApp';
 
@@ -30,6 +31,7 @@ export default async function OrderDetailPage({
       <div className="adm-top">
         <h1>{`Pedido #${order.id}`}</h1>
         <div className="ord-actions no-print">
+          <ConfirmOrderButton id={order.id} confirmed={order.confirmed_at !== null} />
           <OrderWhatsApp
             id={order.id}
             name={order.customer_name}
@@ -42,6 +44,7 @@ export default async function OrderDetailPage({
       </div>
       <p className="section-note">
         {`${formatOrderDate(order.created_at)} · ${units} ${units === 1 ? 'unidad' : 'unidades'}`}
+        {order.confirmed_at && ` · Confirmado el ${formatOrderDate(order.confirmed_at)}`}
       </p>
 
       <div className="pform-grid">

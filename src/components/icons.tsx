@@ -172,6 +172,17 @@ export function IconLogout() {
   );
 }
 
+export function IconTrash() {
+  return (
+    <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.5 6.5h15" />
+      <path d="M9 6.5V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.5" />
+      <path d="M6.5 6.5l1 13.5h9l1-13.5" />
+      <path d="M10 10.5v6M14 10.5v6" />
+    </svg>
+  );
+}
+
 export function IconUpload() {
   return (
     <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">

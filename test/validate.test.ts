@@ -12,6 +12,7 @@ import {
   parsePrice,
   parseStock,
   sameIdSet,
+  sameOrderItems,
 } from '@/lib/validate';
 
 describe('parseId', () => {
@@ -162,5 +163,27 @@ describe('reordenamiento (orden manual)', () => {
     assert.equal(sameIdSet([1, 2, 3], [1, 2]), false); // saca
     assert.equal(sameIdSet([1, 2], [1, 1]), false); // repite
     assert.equal(sameIdSet([1, 2], [1, 3]), false); // cambia
+  });
+});
+
+describe('pedidos repetidos', () => {
+  test('sameOrderItems: mismos productos y cantidades, en cualquier orden', () => {
+    assert.equal(
+      sameOrderItems(
+        [{ id: 1, quantity: 2 }, { id: 5, quantity: 1 }],
+        [{ id: 5, quantity: 1 }, { id: 1, quantity: 2 }]
+      ),
+      true
+    );
+    assert.equal(sameOrderItems([], []), true);
+  });
+
+  test('sameOrderItems: distinto producto, cantidad o largo no es el mismo pedido', () => {
+    assert.equal(sameOrderItems([{ id: 1, quantity: 2 }], [{ id: 1, quantity: 3 }]), false);
+    assert.equal(sameOrderItems([{ id: 1, quantity: 2 }], [{ id: 2, quantity: 2 }]), false);
+    assert.equal(
+      sameOrderItems([{ id: 1, quantity: 1 }], [{ id: 1, quantity: 1 }, { id: 2, quantity: 1 }]),
+      false
+    );
   });
 });

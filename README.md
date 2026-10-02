@@ -88,6 +88,13 @@ cliente por WhatsApp, imprimir o eliminar.
   producto cambia después, el pedido no. Los precios los pone el servidor.
 - El pedido se guarda al tocar el botón: si la persona después no manda el mensaje,
   queda igual en la lista. No descuenta stock: sigue siendo un pedido a confirmar.
+- Reenviar el mismo pedido no lo duplica: el mismo carrito con los mismos datos
+  reusa el mismo link (aunque se recargue la página), y además el servidor no
+  guarda dos veces el mismo teléfono con exactamente los mismos productos y
+  cantidades dentro de las 24 horas.
+- Cada pedido tiene su estado en el panel: **Pendiente / Confirmado** (con la fecha
+  de confirmación guardada, para contar más adelante cuántos terminaron en venta), y
+  un tachito para eliminarlo directo desde la lista.
 - Si el guardado falla, el catálogo avisa y el mensaje igual lleva el detalle en texto.
 - Límites de la ruta pública: cuerpo de 20 KB, 100 productos, 12 pedidos por IP y 240
   en total cada 10 minutos.

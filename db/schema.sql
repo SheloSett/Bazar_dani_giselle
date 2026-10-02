@@ -72,3 +72,7 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 -- panel, nunca en la página pública del pedido. El teléfono se guarda solo con dígitos.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name  TEXT NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT NOT NULL DEFAULT '';
+
+-- Cuándo se confirmó el pedido desde el panel (NULL = pendiente). Sirve para
+-- contar después cuántos pedidos terminaron en venta.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;

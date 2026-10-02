@@ -77,6 +77,18 @@ export function parseOrderItems(value: unknown): { id: number; quantity: number 
   return [...byId].map(([id, quantity]) => ({ id, quantity }));
 }
 
+// ¿Dos pedidos tienen exactamente los mismos productos y cantidades? Para no
+// guardar de nuevo el mismo pedido reenviado (ver createOrder).
+export function sameOrderItems(
+  a: { id: number; quantity: number }[],
+  b: { id: number; quantity: number }[]
+): boolean {
+  if (a.length !== b.length) return false;
+  const key = (list: { id: number; quantity: number }[]) =>
+    list.map((x) => `${x.id}x${x.quantity}`).sort().join(',');
+  return key(a) === key(b);
+}
+
 export const CUSTOMER_NAME_MAX = 80;
 
 // Nombre de quien pide: sin espacios de más, de 2 a 80 caracteres, o null

@@ -2,6 +2,7 @@
 // quedan en el panel y el mensaje lleva un link al detalle con fotos.
 
 import { isUniqueViolation, query } from '@/lib/db';
+import { sameOrderItems } from '@/lib/validate';
 
 // Máximo de una columna INTEGER de Postgres (el total del pedido)
 const PG_INT_MAX = 2_147_483_647;
@@ -27,6 +28,8 @@ export interface Order {
 export interface AdminOrder extends Order {
   customer_name: string;
   customer_phone: string;
+  // Cuándo se marcó como confirmado desde el panel; null = pendiente
+  confirmed_at: Date | null;
 }
 
 export interface OrderSummary {
@@ -36,6 +39,7 @@ export interface OrderSummary {
   customer_name: string;
   customer_phone: string;
   units: number;
+  confirmed_at: Date | null;
 }
 
 export interface Customer {
@@ -86,6 +90,29 @@ export async function createOrder(
 
   const total = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
   if (total > PG_INT_MAX) return 'too-big';
+
+  // Pedido repetido: la misma persona (mismo teléfono) ya mandó exactamente los
+  // mismos productos y cantidades en las últimas 24 horas (reenvíos del mismo
+  // carrito, otra pestaña, otro dispositivo). No se guarda otra vez, así el
+  // panel no se llena de copias. El mismo pedido días después es uno nuevo.
+  const recent = await query<{ order_id: number; product_id: number | null; quantity: number }>(
+    `SELECT i.order_id, i.product_id, i.quantity
+     FROM orders o JOIN order_items i ON i.order_id = o.id
+     WHERE o.customer_phone = $1 AND o.created_at > now() - interval '24 hours'`,
+    [customer.phone]
+  );
+  if (recent.length) {
+    const byOrder = new Map<number, { id: number; quantity: number }[]>();
+    for (const r of recent) {
+      const list = byOrder.get(r.order_id) ?? [];
+      // product_id null = producto borrado después: -1 nunca coincide con uno actual
+      list.push({ id: r.product_id ?? -1, quantity: r.quantity });
+      byOrder.set(r.order_id, list);
+    }
+    const newItems = lines.map((l) => ({ id: l.id, quantity: l.quantity }));
+    for (const items of byOrder.values())
+      if (sameOrderItems(items, newItems)) return 'exists';
+  }
 
   try {
     // Una sola sentencia: o se guarda el pedido entero o no se guarda nada
@@ -141,7 +168,7 @@ export async function getOrder(token: string): Promise<Order | null> {
 
 export async function listOrders(): Promise<OrderSummary[]> {
   return query<OrderSummary>(
-    `SELECT o.id, o.total, o.created_at, o.customer_name, o.customer_phone,
+    `SELECT o.id, o.total, o.created_at, o.customer_name, o.customer_phone, o.confirmed_at,
             COALESCE((SELECT SUM(quantity) FROM order_items i WHERE i.order_id = o.id), 0)::int AS units
      FROM orders o
      ORDER BY o.created_at DESC, o.id DESC
@@ -151,12 +178,24 @@ export async function listOrders(): Promise<OrderSummary[]> {
 
 export async function getAdminOrder(id: number): Promise<AdminOrder | null> {
   const rows = await query<Omit<AdminOrder, 'items'>>(
-    `SELECT id, token, total, created_at, customer_name, customer_phone
+    `SELECT id, token, total, created_at, customer_name, customer_phone, confirmed_at
      FROM orders WHERE id = $1`,
     [id]
   );
   const order = rows[0];
   return order ? { ...order, items: await orderItems(order.id) } : null;
+}
+
+// Marca o desmarca el pedido como confirmado (se hizo la venta). Devuelve
+// false si el pedido no existe.
+export async function setOrderConfirmed(id: number, confirmed: boolean): Promise<boolean> {
+  const rows = await query<{ id: number }>(
+    `UPDATE orders
+     SET confirmed_at = CASE WHEN $2 THEN now() ELSE NULL END
+     WHERE id = $1 RETURNING id`,
+    [id, confirmed]
+  );
+  return rows.length > 0;
 }
 
 export async function deleteOrder(id: number): Promise<boolean> {

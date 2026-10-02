@@ -4,6 +4,8 @@ import { isAdmin } from '@/lib/session';
 import { formatOrderDateShort, listOrders } from '@/lib/orders';
 import { money } from '@/lib/catalog';
 import { OrderWhatsApp } from '@/components/admin/OrderWhatsApp';
+import { ConfirmOrderButton } from '@/components/admin/ConfirmOrderButton';
+import { DeleteOrderButton } from '@/components/admin/DeleteOrderButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,13 +33,15 @@ export default async function OrdersPage() {
             <th>Teléfono</th>
             <th>Unidades</th>
             <th>Total</th>
+            <th>Estado</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {orders.length === 0 && (
             <tr>
-              <td colSpan={7} className="empty">
+              {/* colSpan era 7: se le suma 1 por la columna nueva de Estado */}
+              <td colSpan={8} className="empty">
                 Todavía no hay pedidos.
               </td>
             </tr>
@@ -53,9 +57,13 @@ export default async function OrdersPage() {
               <td>{o.units}</td>
               <td className="price-cell">{money(o.total)}</td>
               <td>
+                <ConfirmOrderButton id={o.id} confirmed={o.confirmed_at !== null} />
+              </td>
+              <td>
                 <div className="row-actions">
                   <OrderWhatsApp id={o.id} name={o.customer_name} phone={o.customer_phone} />
                   <Link href={`/admin/orders/${o.id}`}>Ver</Link>
+                  <DeleteOrderButton id={o.id} compact />
                 </div>
               </td>
             </tr>

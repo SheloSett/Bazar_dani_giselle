@@ -349,19 +349,25 @@ img { max-width: 100%; }
 }
 /* la barra de pedido flota abajo: dejarle lugar para que no tape el pie */
 .site-footer.with-bar .foot-bottom { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-/* créditos del desarrollador, un escalón más apagado que el © */
+/* créditos del desarrollador. Pedido del usuario: centrados, en negrita y más
+   grandes (antes iban apagados a rgba .45, sin centrar y al tamaño del ©) */
+.foot-bottom { text-align: center; }
 .foot-bottom p { margin: 0; }
 .foot-credit {
-  margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
-  color: rgba(255, 255, 255, 0.45);
+  margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 4px 12px; font-size: 0.95rem; font-weight: 600; color: rgba(255, 255, 255, 0.82);
 }
 .foot-credit a {
   display: inline-flex; align-items: center; gap: 6px;
-  color: inherit; text-decoration: none;
+  color: #fff; text-decoration: none;
 }
 @media (hover: hover) {
-  .foot-credit a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+  .foot-credit a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
+
+/* tachito para eliminar un pedido desde la lista */
+.btn-trash { padding: 6px 9px; }
+.btn-trash .ic { width: 1.05em; height: 1.05em; }
 @media (max-width: 720px) { .foot-in { grid-template-columns: 1fr; gap: 26px; padding-top: 38px; } }
 
 /* ---------- WhatsApp flotante ---------- */
