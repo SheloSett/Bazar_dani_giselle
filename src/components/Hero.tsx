@@ -49,18 +49,20 @@ export function Hero({
   );
 }
 
-// Textos fijos: si cambian las condiciones del negocio, se editan acá
-const PERKS = [
-  { icon: <IconTruck />, title: 'Envío en el día', text: 'Coordinamos la entrega por WhatsApp' },
-  { icon: <IconStore />, title: 'Retiro en el local', text: 'Pasá a buscar tu pedido' },
-  { icon: <IconWhatsApp />, title: 'Pedido por WhatsApp', text: 'Armás la lista y la enviás en un toque' },
-];
+// Los tres beneficios se editan en el panel (Ajustes). El ícono de cada lugar es fijo;
+// el que queda sin título no se muestra, y sin ninguno desaparece la franja entera.
+export function Perks({ settings }: { settings: Settings }) {
+  const perks = [
+    { icon: <IconTruck />, title: settings.perk1_title, text: settings.perk1_text },
+    { icon: <IconStore />, title: settings.perk2_title, text: settings.perk2_text },
+    { icon: <IconWhatsApp />, title: settings.perk3_title, text: settings.perk3_text },
+  ].filter((p) => p.title.trim());
+  if (!perks.length) return null;
 
-export function Perks() {
   return (
     <section className="perks" aria-label="Cómo comprar">
-      <ul>
-        {PERKS.map((p) => (
+      <ul className={`n${perks.length}`}>
+        {perks.map((p) => (
           <li key={p.title}>
             <span className="perk-ic">{p.icon}</span>
             <span>

@@ -8,6 +8,7 @@ import { money, ogImagePath, thumbUrl } from '@/lib/catalog';
 import { siteBaseUrl } from '@/lib/site';
 import { ORDER_TOKEN_RE } from '@/lib/validate';
 import { IconPhoto } from '@/components/icons';
+import { Brand } from '@/components/Brand';
 import { PrintButton } from '@/components/PrintButton';
 
 // Detalle de un pedido con fotos: es el link que va en el mensaje de WhatsApp.
@@ -62,7 +63,7 @@ export default async function OrderPage({ params }: Props) {
   return (
     <main className="ord">
       <div className="ord-top">
-        <span className="brand">{settings.shop_name}</span>
+        <Brand name={settings.shop_name} logo={settings.logo} />
         <PrintButton />
       </div>
 

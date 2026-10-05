@@ -36,8 +36,10 @@ services:
       SITE_URL: ${SITE_URL:-}
     volumes:
       - uploads:/app/uploads
+    # Solo en 127.0.0.1: desde afuera se entra por el proxy (Caddy), que le pone
+    # HTTPS y le pasa a la app la IP real de cada visita
     ports:
-      - "3010:3000"
+      - "127.0.0.1:3010:3000"
 
 volumes:
   pgdata:

@@ -21,6 +21,9 @@
 * { box-sizing: border-box; }
 
 html, body { padding: 0; margin: 0; }
+/* el lugar de la barra de desplazamiento queda reservado: al abrir un panel (que
+   frena el desplazamiento del fondo) la página no pega un salto de costado */
+html { scrollbar-gutter: stable; }
 
 body {
   background: var(--bg);
@@ -73,6 +76,10 @@ img { max-width: 100%; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 .brand { font-weight: 700; font-size: 1.22rem; letter-spacing: -0.01em; }
+/* logo del negocio en lugar del nombre (se carga en Ajustes) */
+.brand-logo { display: block; height: 40px; width: auto; max-width: 200px; object-fit: contain; }
+@media (max-width: 560px) { .brand-logo { height: 34px; max-width: 150px; } }
+.pr-head .brand-logo { height: 64px; max-width: 260px; margin-bottom: 10px; }
 .btn-cart { position: relative; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.88rem; }
 .btn-cart .n {
   background: var(--accent); color: #fff; border-radius: 999px;
@@ -130,6 +137,9 @@ img { max-width: 100%; }
 }
 .perks li { display: flex; align-items: center; gap: 14px; padding: 18px 22px; min-width: 0; }
 .perks li + li { border-left: 1px solid var(--line); }
+/* si desde el panel se ocultó alguno, los que quedan se reparten el ancho */
+.perks ul.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.perks ul.n1 { grid-template-columns: minmax(0, 1fr); }
 .perk-ic {
   flex: 0 0 auto; width: 44px; height: 44px; border-radius: 999px;
   display: grid; place-items: center; background: var(--accent-soft); color: var(--accent);
@@ -403,10 +413,13 @@ img { max-width: 100%; }
 .overlay {
   position: fixed; inset: 0; z-index: 60; background: rgba(22, 24, 26, 0.45);
   display: grid; align-items: end; justify-items: center;
+  /* al llegar al final del panel, el gesto no sigue de largo hacia la página de atrás */
+  overscroll-behavior: contain;
 }
 .sheet {
   background: #fff; color: var(--ink);
   width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 20px 20px 0 0;
   padding: 22px 22px calc(24px + env(safe-area-inset-bottom, 0px));
   animation: sheet-up 0.2s ease;
@@ -574,6 +587,10 @@ img { max-width: 100%; }
 .ord-total strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .ord-note { color: var(--soft); font-size: 0.86rem; margin: 6px 0 22px; }
 .ord-back { color: var(--accent); font-weight: 600; text-decoration: none; }
+/* páginas de "no encontrado" y de error */
+.oops { padding-top: 90px; text-align: center; }
+.oops .ord-meta { margin-bottom: 26px; }
+.oops .btn { display: inline-flex; }
 /* el mismo pedido en el panel: acciones y datos del cliente */
 .ord-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ord-who { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.94rem; }
@@ -797,6 +814,12 @@ img { max-width: 100%; }
 .adm-card .check { margin-bottom: 8px; }
 .adm-card .photos-grid { margin-top: 0; }
 .card-note { margin: 0; color: var(--soft); font-size: 0.86rem; }
+
+/* pantalla de Ajustes: las mismas tarjetas, una debajo de la otra */
+.settings, .settings-form { display: grid; gap: 18px; }
+.settings { max-width: 760px; }
+.settings > h1 { margin: 0; }
+.settings-save .msg-ok, .settings-save .msg-err { margin-bottom: 12px; }
 /* barra de acciones siempre visible al pie */
 .pform-bar {
   position: sticky; bottom: 0; z-index: 10; margin-top: 18px; padding: 14px 0;
@@ -859,6 +882,18 @@ img { max-width: 100%; }
 .dropzone strong { color: var(--ink); }
 .dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
 .dropzone.busy { opacity: 0.7; cursor: progress; }
+
+/* logo del negocio en Ajustes: vista previa y botones */
+.logo-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.logo-box {
+  flex: 0 0 auto; width: 220px; height: 96px; padding: 12px;
+  display: grid; place-items: center; text-align: center;
+  border: 1px solid #cdd3d8; border-radius: 14px; background: #fff;
+  color: var(--soft); font-size: 0.84rem;
+}
+.logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.logo-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.logo-actions label { cursor: pointer; }
 
 .msg-err {
   background: #fbeaea; color: #a3271f; border-radius: 12px;

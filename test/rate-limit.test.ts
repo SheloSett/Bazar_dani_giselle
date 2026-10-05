@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLoginLimiter } from '@/lib/rate-limit';
+import { bodyWithin, clientIp, createLoginLimiter } from '@/lib/rate-limit';
 
 function setup() {
   let t = 1_000_000;
@@ -45,5 +45,25 @@ describe('límite de intentos de login', () => {
     limiter.fail('1.1.1.1');
     limiter.fail('1.1.1.1');
     assert.equal(limiter.retryAfter('1.1.1.1'), 0);
+  });
+});
+
+describe('tope de tamaño y origen del pedido', () => {
+  const h = (init: Record<string, string>) => new Headers(init);
+
+  test('el cuerpo tiene que declarar su tamaño y entrar en el tope', () => {
+    assert.equal(bodyWithin(h({ 'content-length': '120' }), 2000), true);
+    assert.equal(bodyWithin(h({ 'content-length': '2000' }), 2000), true);
+    assert.equal(bodyWithin(h({ 'content-length': '2001' }), 2000), false);
+    assert.equal(bodyWithin(h({ 'content-length': '83886080' }), 2000), false);
+    assert.equal(bodyWithin(h({}), 2000), false);
+    assert.equal(bodyWithin(h({ 'content-length': '0' }), 2000), false);
+    assert.equal(bodyWithin(h({ 'content-length': 'abc' }), 2000), false);
+  });
+
+  test('la IP sale del primer valor que manda el proxy', () => {
+    assert.equal(clientIp(h({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })), '203.0.113.7');
+    assert.equal(clientIp(h({ 'x-real-ip': '203.0.113.9' })), '203.0.113.9');
+    assert.equal(clientIp(h({})), 'desconocida');
   });
 });

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getAdminProduct, listCategories, listProductPhotos } from '@/lib/data';
+import { requireAdmin } from '@/lib/session';
 import { ProductForm } from '@/components/admin/ProductForm';
 import { parseId } from '@/lib/validate';
 
@@ -10,6 +11,7 @@ export default async function EditProductPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdmin();
   const productId = parseId((await params).id);
   if (!productId) notFound();
 

@@ -58,6 +58,10 @@ export default async function PrintCatalogPage() {
       </div>
 
       <header className="pr-head">
+        {settings.logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="brand-logo" src={thumbUrl(settings.logo)} alt="" />
+        )}
         <h1>{settings.shop_name}</h1>
         {settings.tagline && <p className="pr-tag">{settings.tagline}</p>}
         <p className="pr-meta">

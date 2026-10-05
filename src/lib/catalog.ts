@@ -11,6 +11,11 @@ export const money = (n: number) =>
 // Con esta cantidad o menos se avisa que quedan pocas unidades
 export const LOW_STOCK = 3;
 
+// El catálogo público no manda el stock real por encima de este número: con 500
+// unidades llega "20". Así no queda a la vista cuánta mercadería hay, y es también
+// el máximo de un mismo producto que se puede sumar a un pedido.
+export const PUBLIC_STOCK_CAP = 20;
+
 // stock null = no se controla: siempre disponible
 export function maxQuantity(stock: number | null): number {
   return stock === null ? Infinity : Math.max(0, stock);

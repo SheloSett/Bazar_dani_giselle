@@ -50,12 +50,17 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   const { products, categories, settings } = await loadCatalog();
 
+  // Al navegador van solo los rubros que tienen algo para mostrar: los vacíos o con
+  // todos sus productos ocultos no tienen por qué figurar en el código de la página
+  const inUse = new Set(products.map((p) => p.category));
+  const shown = categories.filter((c) => inUse.has(c.name));
+
   return (
     <Catalog
       products={products}
-      categories={categories.map((c) => c.name)}
+      categories={shown.map((c) => c.name)}
       categoryPhotos={Object.fromEntries(
-        categories.flatMap((c) => (c.photo ? [[c.name, c.photo]] : []))
+        shown.flatMap((c) => (c.photo ? [[c.name, c.photo]] : []))
       )}
       settings={settings}
     />

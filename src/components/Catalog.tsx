@@ -10,10 +10,12 @@ import {
   maxQuantity,
   money,
   photoUrl,
+  PUBLIC_STOCK_CAP,
   stockDetail,
   thumbUrl,
   unavailableNotice,
 } from '@/lib/catalog';
+import { Brand } from '@/components/Brand';
 import { ProductCard } from '@/components/ProductCard';
 import { Gallery } from '@/components/Gallery';
 import { Hero, Perks } from '@/components/Hero';
@@ -143,6 +145,25 @@ export function Catalog({
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(''), ms);
   }, []);
+
+  // Con un panel abierto (ficha o pedido): Escape lo cierra y la página de atrás no
+  // se desliza
+  const sheetOpen = current !== null || cartOpen;
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setCurrent(null);
+      setCartOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = before;
+    };
+  }, [sheetOpen]);
 
   // Carga el carrito guardado. Si algún producto ya no está en el catálogo (se ocultó o
   // se borró desde el panel), lo saca y avisa, en vez de hacerlo desaparecer en silencio.
@@ -311,7 +332,13 @@ export function Catalog({
     // Nunca más unidades que las disponibles
     const next = Math.min(maxQuantity(current.stock), have + qty);
     if (next <= have) {
-      showToast('No hay más unidades disponibles');
+      // Al público no le llega el stock exacto por encima del tope: ahí puede haber más
+      showToast(
+        current.stock !== null && current.stock >= PUBLIC_STOCK_CAP
+          ? `Para pedir más de ${PUBLIC_STOCK_CAP} unidades, consultanos por WhatsApp`
+          : 'No hay más unidades disponibles',
+        3500
+      );
       return;
     }
     updateCart({ ...cart, [current.id]: next });
@@ -344,7 +371,7 @@ export function Catalog({
     <>
       <header className="site-header">
         <div className="header-in">
-          <span className="brand">{settings.shop_name}</span>
+          <Brand name={settings.shop_name} logo={settings.logo} />
           <button
             className="btn-cart"
             onClick={() => setCartOpen(true)}
@@ -362,7 +389,7 @@ export function Catalog({
         waHref={waGeneral}
         onBrowse={browse}
       />
-      <Perks />
+      <Perks settings={settings} />
       <CategoryTiles tiles={tiles} active={category} onPick={pickCategory} />
 
       <section className="tools">

@@ -54,6 +54,24 @@ El catálogo muestra los rubros y los productos en el orden del panel. Las flech
 **Productos** mueven cada producto dentro de su rubro. Los productos sin stock van
 igual al final de su rubro.
 
+## Ajustes del negocio
+
+En **Ajustes** se cambian el nombre, el WhatsApp donde llegan los pedidos (se valida
+y se guarda solo con dígitos), el título y el texto de la portada, y los tres
+**beneficios** de la franja con íconos ("Envío en el día", etc.): cada uno tiene
+título y aclaración, y el que queda sin título no se muestra.
+
+## Logo
+
+En **Ajustes → Logo** se sube la imagen del negocio (JPG, PNG, WebP o AVIF; lo ideal
+es un PNG con fondo transparente, más ancho que alto). Cuando hay logo, reemplaza al
+nombre en el encabezado del catálogo y de los pedidos, y aparece en el catálogo para
+imprimir; el pie sigue mostrando el nombre como texto. Pasa por el mismo procesado
+que las fotos, y al cambiarlo o quitarlo se borra el archivo anterior.
+
+El ícono de la pestaña del navegador (`/icono.png`) sale del logo; si no hay logo,
+es un ícono genérico con el verde del sitio.
+
 ## Catálogo en PDF
 
 Desde el panel, **Catálogo en PDF** abre `/imprimir`: el catálogo entero (solo los
@@ -142,9 +160,14 @@ cd Bazar_dani_giselle
 docker compose up -d --build
 ```
 
-Queda accesible en `http://IP-DEL-VPS:3010` (catálogo) y `/admin` (panel).
+La app queda escuchando en `127.0.0.1:3010`, o sea solo dentro del VPS: desde afuera
+se entra por un proxy que le pone HTTPS (ver "Publicarla con Caddy" más abajo). Para
+probarla sin proxy alcanza con `curl http://localhost:3010` en el servidor.
 Las migraciones corren solas al arrancar. Fotos y base quedan en volúmenes
 (`uploads`, `pgdata`), sobreviven a rebuilds.
+
+En producción `ADMIN_PASSWORD` tiene que tener al menos 8 caracteres: con una más
+corta el login no deja entrar y avisa por qué.
 
 Postgres se publica solo en `127.0.0.1:5433` (para desarrollo local): desde
 afuera del VPS no se llega. En el VPS se puede borrar ese bloque `ports`.
@@ -182,7 +205,9 @@ gunzip -c backups/db-FECHA.sql.gz | docker compose exec -T db psql -U bazar baza
 docker compose exec -T app tar -xzf - -C /app < backups/uploads-FECHA.tgz
 ```
 
-### Cuando haya dominio (Caddy)
+### Publicarla con Caddy
+
+Con Caddy instalado en el mismo servidor:
 
 ```
 catalogo.ejemplo.com {
@@ -190,9 +215,46 @@ catalogo.ejemplo.com {
 }
 ```
 
-La cookie de sesión se marca `secure` sola cuando el pedido llega por HTTPS
-(Caddy manda `X-Forwarded-Proto`). Con Caddy delante conviene cambiar el
-`3010:3000` por `127.0.0.1:3010:3000` para que no se pueda entrar salteando HTTPS.
+Si Caddy corre en un contenedor (como en el VPS actual, donde es el contenedor
+`proxy` y cada sitio tiene su archivo en `/srv/proxy/sites/`), no llega a
+`localhost`: hay que sumar la app a la red de Docker del proxy con un
+`docker-compose.override.yml` al lado del compose (no va a git) y apuntar al contenedor:
+
+```yaml
+services:
+  app:
+    networks: [default, edge]
+networks:
+  edge:
+    external: true
+```
+
+```
+catalogo.ejemplo.com {
+    encode zstd gzip
+    reverse_proxy bazar_dani_giselle-app-1:3000
+}
+```
+
+Caddy saca el certificado solo. La cookie de sesión se marca `secure` cuando el
+pedido llega por HTTPS, y el límite de intentos del login usa la IP real que manda
+el proxy.
+
+## Seguridad
+
+- Todas las respuestas llevan cabeceras de seguridad (`next.config.mjs`): política de
+  contenido que solo permite recursos del propio sitio, no se puede embeber en otra
+  página, y HTTPS obligatorio una vez que se entró por HTTPS.
+- El optimizador de imágenes de Next (`/_next/image`) está cerrado: el sitio no lo
+  usa y abierto permitía gastarle procesador y disco al servidor.
+- Las rutas del panel que cambian algo solo aceptan pedidos que salen del propio
+  sitio (`src/middleware.ts`), además de exigir la sesión.
+- El login y el cambio de clave tienen tope de tamaño y de intentos (5 por IP y 30
+  en total cada 15 minutos).
+- Cada página del panel verifica la sesión por su cuenta, no solo el middleware.
+- Al público no le llega el stock real por encima de 20 unidades
+  (`PUBLIC_STOCK_CAP`), ni los rubros que no tienen productos visibles. Ese número es
+  también el máximo de un mismo producto por pedido.
 
 ## Mejoras pendientes
 

@@ -55,8 +55,17 @@ export function createLoginLimiter(
 
 const globalForLimiter = globalThis as unknown as {
   loginLimiter?: ReturnType<typeof createLoginLimiter>;
+  passwordLimiter?: ReturnType<typeof createLoginLimiter>;
   orderLimiter?: ReturnType<typeof createLoginLimiter>;
 };
+
+// "Cambiar clave" pide la clave actual: con una sesión robada no tiene que servir
+// para adivinarla. Mismos topes que el login, contados aparte.
+export const passwordLimiter = (globalForLimiter.passwordLimiter ??= createLoginLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxPerIp: 5,
+  maxGlobal: 30,
+}));
 
 // 5 fallos por IP y 30 en total cada 15 minutos
 export const loginLimiter = (globalForLimiter.loginLimiter ??= createLoginLimiter({
@@ -73,6 +82,13 @@ export const orderLimiter = (globalForLimiter.orderLimiter ??= createLoginLimite
   maxPerIp: 12,
   maxGlobal: 240,
 }));
+
+// El cuerpo declara su tamaño y entra en el tope. Se mira antes de leerlo: sin esto,
+// una ruta que acepta JSON sin sesión se traga cuerpos de cualquier tamaño.
+export function bodyWithin(headers: Headers, maxBytes: number): boolean {
+  const length = Number(headers.get('content-length'));
+  return Number.isFinite(length) && length > 0 && length <= maxBytes;
+}
 
 // IP de quien hace el pedido. Sin proxy delante, Next la toma de la conexión;
 // con proxy (Caddy) llega en X-Forwarded-For.

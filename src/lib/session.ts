@@ -1,5 +1,6 @@
 // Helpers de sesión para route handlers (Node)
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import type { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/auth';
 import { newSessionToken, verifySession } from '@/lib/credentials';
@@ -7,6 +8,12 @@ import { newSessionToken, verifySession } from '@/lib/credentials';
 export async function isAdmin(): Promise<boolean> {
   const store = await cookies();
   return verifySession(store.get(SESSION_COOKIE)?.value);
+}
+
+// Para las páginas del panel: el middleware ya las protege, pero cada una verifica
+// la sesión por su cuenta, por si el middleware llegara a fallar o a saltearse
+export async function requireAdmin(): Promise<void> {
+  if (!(await isAdmin())) redirect('/admin/login');
 }
 
 function isHttps(req: NextRequest): boolean {

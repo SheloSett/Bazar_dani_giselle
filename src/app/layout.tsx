@@ -11,6 +11,8 @@ const albert = Albert_Sans({
 export const metadata: Metadata = {
   title: 'Catálogo',
   description: 'Catálogo de productos con pedidos por WhatsApp',
+  // Sale del logo cargado en el panel (o un ícono genérico): ver app/icono.png
+  icons: { icon: '/icono.png', apple: '/icono.png' },
 };
 
 export const viewport: Viewport = {

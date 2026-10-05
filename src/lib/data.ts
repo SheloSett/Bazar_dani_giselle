@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { PUBLIC_STOCK_CAP } from '@/lib/catalog';
 import { sameIdSet } from '@/lib/validate';
 
 // ---------- tipos ----------
@@ -36,25 +37,56 @@ export interface AdminPhoto {
   position: number;
 }
 
-export interface Settings {
+// Ajustes de texto: los que se editan en el formulario del panel
+export interface TextSettings {
   shop_name: string;
   whatsapp_phone: string;
   tagline: string;
   footer_note: string;
+  // Los tres beneficios de la portada (título + aclaración). Un título vacío lo oculta.
+  perk1_title: string;
+  perk1_text: string;
+  perk2_title: string;
+  perk2_text: string;
+  perk3_title: string;
+  perk3_text: string;
 }
 
-export const SETTING_KEYS: (keyof Settings)[] = [
+export interface Settings extends TextSettings {
+  // Logo del negocio (archivo en uploads). null = se muestra el nombre como texto.
+  // No es un ajuste de texto: se cambia subiendo una imagen (setLogo).
+  logo: string | null;
+}
+
+export const SETTING_KEYS: (keyof TextSettings)[] = [
   'shop_name',
   'whatsapp_phone',
   'tagline',
   'footer_note',
+  'perk1_title',
+  'perk1_text',
+  'perk2_title',
+  'perk2_text',
+  'perk3_title',
+  'perk3_text',
 ];
 
+const LOGO_KEY = 'logo';
+
+// Lo que vale mientras el panel no lo cambie. Los beneficios arrancan con los textos
+// que antes estaban fijos en el código.
 const SETTINGS_DEFAULTS: Settings = {
   shop_name: 'Catálogo',
   whatsapp_phone: '',
   tagline: '',
   footer_note: '',
+  perk1_title: 'Envío en el día',
+  perk1_text: 'Coordinamos la entrega por WhatsApp',
+  perk2_title: 'Retiro en el local',
+  perk2_text: 'Pasá a buscar tu pedido',
+  perk3_title: 'Pedido por WhatsApp',
+  perk3_text: 'Armás la lista y la enviás en un toque',
+  logo: null,
 };
 
 // ---------- settings ----------
@@ -65,11 +97,30 @@ export async function getSettings(): Promise<Settings> {
   );
   const s = { ...SETTINGS_DEFAULTS };
   for (const r of rows) {
-    if ((SETTING_KEYS as string[]).includes(r.key)) {
-      s[r.key as keyof Settings] = r.value;
+    if (r.key === LOGO_KEY) {
+      s.logo = r.value || null;
+    } else if ((SETTING_KEYS as string[]).includes(r.key)) {
+      s[r.key as keyof TextSettings] = r.value;
     }
   }
   return s;
+}
+
+// Cambia (o quita, con null) el logo. Devuelve el archivo anterior, para borrarlo del disco.
+export async function setLogo(filename: string | null): Promise<string | null> {
+  const old = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [
+    LOGO_KEY,
+  ]);
+  if (filename) {
+    await query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [LOGO_KEY, filename]
+    );
+  } else {
+    await query('DELETE FROM settings WHERE key = $1', [LOGO_KEY]);
+  }
+  return old[0]?.value || null;
 }
 
 export async function updateSettings(entries: Partial<Settings>): Promise<void> {
@@ -166,13 +217,17 @@ const PHOTO_AGG = `
 const PRODUCT_COLS = 'p.id, p.name, p.description, p.price, p.compare_price, p.stock';
 
 export async function listPublicProducts(): Promise<PublicProduct[]> {
-  // Los productos sin stock van al final de su categoría
+  // Los productos sin stock van al final de su categoría.
+  // El stock sale acotado (PUBLIC_STOCK_CAP): el número real solo lo ve el panel.
   return query<PublicProduct>(
-    `SELECT ${PRODUCT_COLS}, c.name AS category, ${PHOTO_AGG}
+    `SELECT p.id, p.name, p.description, p.price, p.compare_price,
+            CASE WHEN p.stock IS NULL THEN NULL ELSE LEAST(p.stock, $1::int) END AS stock,
+            c.name AS category, ${PHOTO_AGG}
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
      WHERE p.visible
-     ORDER BY c.position NULLS LAST, (COALESCE(p.stock, 1) = 0), p.position, p.id`
+     ORDER BY c.position NULLS LAST, (COALESCE(p.stock, 1) = 0), p.position, p.id`,
+    [PUBLIC_STOCK_CAP]
   );
 }
 

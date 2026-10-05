@@ -23,7 +23,7 @@ INSERT INTO products (name, description, price, category_id, position) VALUES
   ('Platos playos loza ×6',       'Loza reforzada de uso diario, borde clásico. Aptos microondas.',                        26700, (SELECT id FROM categories WHERE name = 'Mesa y vasos'), 4);
 
 INSERT INTO settings (key, value) VALUES
-  ('shop_name',      'Bazar Aurora'),
+  ('shop_name',      'Bazar Deco'),
   ('whatsapp_phone', '5491100000000'),
   ('tagline',        'Todo para la cocina y la mesa'),
   ('footer_note',    'Retiro en el local o envío en el día. Los precios se confirman al cotizar.')
