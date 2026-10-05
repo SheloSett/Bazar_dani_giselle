@@ -1,7 +1,8 @@
 // Pedidos armados en el catálogo. Se guardan al tocar "Enviar pedido por WhatsApp":
 // quedan en el panel y el mensaje lleva un link al detalle con fotos.
 
-import { isUniqueViolation, query } from '@/lib/db';
+import { isUniqueViolation, query, transaction } from '@/lib/db';
+import { planStock, type ShortItem, type StockLine } from '@/lib/order-rules';
 import { sameOrderItems } from '@/lib/validate';
 
 // Máximo de una columna INTEGER de Postgres (el total del pedido)
@@ -24,12 +25,21 @@ export interface Order {
   items: OrderItem[];
 }
 
+// Cada renglón como lo ve el panel: suma el stock
+export interface AdminOrderItem extends OrderItem {
+  // Unidades que descontó del stock al confirmarse el pedido (0 = nada)
+  stock_taken: number;
+  // Stock que tiene hoy el producto; null = no se controla o el producto ya no existe
+  stock: number | null;
+}
+
 // Lo que ve el panel: suma nombre y teléfono del cliente
 export interface AdminOrder extends Order {
   customer_name: string;
   customer_phone: string;
   // Cuándo se marcó como confirmado desde el panel; null = pendiente
   confirmed_at: Date | null;
+  items: AdminOrderItem[];
 }
 
 export interface OrderSummary {
@@ -40,7 +50,25 @@ export interface OrderSummary {
   customer_phone: string;
   units: number;
   confirmed_at: Date | null;
+  // Días enteros desde que se hizo el pedido
+  waiting_days: number;
 }
+
+// Para el recordatorio del panel
+export interface PendingSummary {
+  // Pedidos sin confirmar
+  count: number;
+  // De esos, los que esperan hace más de un día
+  stale: number;
+  // Días que lleva esperando el más viejo
+  oldest_days: number;
+}
+
+export type ConfirmResult =
+  | { status: 'ok' }
+  | { status: 'missing' }
+  // No alcanza el stock de estos productos: no se confirmó
+  | { status: 'short'; short: ShortItem[] };
 
 export interface Customer {
   name: string;
@@ -166,14 +194,26 @@ export async function getOrder(token: string): Promise<Order | null> {
 
 // ---------- panel ----------
 
+// Primero los pendientes (lo que falta resolver), después los confirmados
 export async function listOrders(): Promise<OrderSummary[]> {
   return query<OrderSummary>(
     `SELECT o.id, o.total, o.created_at, o.customer_name, o.customer_phone, o.confirmed_at,
-            COALESCE((SELECT SUM(quantity) FROM order_items i WHERE i.order_id = o.id), 0)::int AS units
+            COALESCE((SELECT SUM(quantity) FROM order_items i WHERE i.order_id = o.id), 0)::int AS units,
+            EXTRACT(DAY FROM now() - o.created_at)::int AS waiting_days
      FROM orders o
-     ORDER BY o.created_at DESC, o.id DESC
+     ORDER BY (o.confirmed_at IS NOT NULL), o.created_at DESC, o.id DESC
      LIMIT 500`
   );
+}
+
+export async function pendingSummary(): Promise<PendingSummary> {
+  const rows = await query<PendingSummary>(
+    `SELECT COUNT(*)::int AS count,
+            (COUNT(*) FILTER (WHERE created_at < now() - interval '1 day'))::int AS stale,
+            COALESCE(EXTRACT(DAY FROM now() - MIN(created_at)), 0)::int AS oldest_days
+     FROM orders WHERE confirmed_at IS NULL`
+  );
+  return rows[0];
 }
 
 export async function getAdminOrder(id: number): Promise<AdminOrder | null> {
@@ -183,21 +223,84 @@ export async function getAdminOrder(id: number): Promise<AdminOrder | null> {
     [id]
   );
   const order = rows[0];
-  return order ? { ...order, items: await orderItems(order.id) } : null;
-}
-
-// Marca o desmarca el pedido como confirmado (se hizo la venta). Devuelve
-// false si el pedido no existe.
-export async function setOrderConfirmed(id: number, confirmed: boolean): Promise<boolean> {
-  const rows = await query<{ id: number }>(
-    `UPDATE orders
-     SET confirmed_at = CASE WHEN $2 THEN now() ELSE NULL END
-     WHERE id = $1 RETURNING id`,
-    [id, confirmed]
+  if (!order) return null;
+  const items = await query<AdminOrderItem>(
+    `SELECT i.product_id, i.name, i.price, i.quantity, i.photo, i.stock_taken, p.stock
+     FROM order_items i LEFT JOIN products p ON p.id = i.product_id
+     WHERE i.order_id = $1 ORDER BY i.position, i.id`,
+    [order.id]
   );
-  return rows.length > 0;
+  return { ...order, items };
 }
 
+// Marca el pedido como confirmado (se hizo la venta) y descuenta sus unidades del
+// stock de cada producto que lo controla. Si de alguno no alcanza, no confirma y
+// devuelve cuáles; con force confirma igual y descuenta lo que haya (el stock no
+// baja de 0). Cada renglón anota lo que descontó, para poder devolverlo.
+export async function confirmOrder(id: number, force = false): Promise<ConfirmResult> {
+  return transaction<ConfirmResult>(async (q) => {
+    // FOR UPDATE: dos toques seguidos al botón no descuentan dos veces
+    const orders = await q<{ confirmed_at: Date | null }>(
+      'SELECT confirmed_at FROM orders WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (!orders.length) return { status: 'missing' };
+    if (orders[0].confirmed_at) return { status: 'ok' };
+
+    const lines = await q<StockLine>(
+      `SELECT i.id AS "itemId", p.id AS "productId", i.name, i.quantity, p.stock
+       FROM order_items i JOIN products p ON p.id = i.product_id
+       WHERE i.order_id = $1 AND p.stock IS NOT NULL
+       ORDER BY p.id, i.id
+       FOR UPDATE OF p`,
+      [id]
+    );
+    const plan = planStock(lines);
+    if (plan.short.length && !force) return { status: 'short', short: plan.short };
+
+    await q(
+      `UPDATE order_items i SET stock_taken = v.take
+       FROM unnest($1::int[], $2::int[]) AS v(id, take) WHERE i.id = v.id`,
+      [plan.takes.map((t) => t.itemId), plan.takes.map((t) => t.take)]
+    );
+    await q(
+      `UPDATE products p SET stock = v.stock
+       FROM unnest($1::int[], $2::int[]) AS v(id, stock) WHERE p.id = v.id`,
+      [plan.stock.map((s) => s.productId), plan.stock.map((s) => s.stock)]
+    );
+    await q('UPDATE orders SET confirmed_at = now() WHERE id = $1', [id]);
+    return { status: 'ok' };
+  });
+}
+
+// Vuelve el pedido a pendiente y devuelve al stock lo que había descontado (a los
+// productos que siguen existiendo y controlando stock). Devuelve false si el
+// pedido no existe.
+export async function unconfirmOrder(id: number): Promise<boolean> {
+  return transaction(async (q) => {
+    const orders = await q<{ confirmed_at: Date | null }>(
+      'SELECT confirmed_at FROM orders WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (!orders.length) return false;
+    if (!orders[0].confirmed_at) return true;
+
+    await q(
+      `UPDATE products p SET stock = p.stock + t.units
+       FROM (SELECT product_id, SUM(stock_taken)::int AS units FROM order_items
+             WHERE order_id = $1 AND stock_taken > 0 AND product_id IS NOT NULL
+             GROUP BY product_id) t
+       WHERE p.id = t.product_id AND p.stock IS NOT NULL`,
+      [id]
+    );
+    await q('UPDATE order_items SET stock_taken = 0 WHERE order_id = $1', [id]);
+    await q('UPDATE orders SET confirmed_at = NULL WHERE id = $1', [id]);
+    return true;
+  });
+}
+
+// Eliminar un pedido no toca el stock: uno confirmado ya se vendió. Si la venta se
+// canceló, primero se lo vuelve a pendiente (eso sí devuelve las unidades).
 export async function deleteOrder(id: number): Promise<boolean> {
   const rows = await query<{ id: number }>('DELETE FROM orders WHERE id = $1 RETURNING id', [id]);
   return rows.length > 0;

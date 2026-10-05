@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { PublicProduct, Settings } from '@/lib/data';
-import { CUSTOMER_NAME_MAX, parseCustomerName, parsePhone } from '@/lib/validate';
+import { CUSTOMER_NAME_MAX, checkCustomerPhone, parseCustomerName } from '@/lib/validate';
 import {
   discountPercent,
   isOutOfStock,
@@ -98,7 +98,8 @@ export function Catalog({
   const [customer, setCustomer] = useState({ name: '', phone: '' });
   const [customerErrors, setCustomerErrors] = useState(false);
   const customerName = parseCustomerName(customer.name);
-  const customerPhone = parsePhone(customer.phone);
+  const phoneCheck = checkCustomerPhone(customer.phone);
+  const customerPhone = phoneCheck.ok ? phoneCheck.phone : null;
 
   useEffect(() => {
     const saved = readStore<{ name?: unknown; phone?: unknown }>(CUSTOMER_KEY);
@@ -609,7 +610,9 @@ export function Catalog({
                     <p className="who-err" role="alert">
                       {!customerName
                         ? 'Escribí tu nombre para enviar el pedido.'
-                        : 'Escribí un teléfono válido (con código de área) para enviar el pedido.'}
+                        : !phoneCheck.ok && phoneCheck.error === 'inventado'
+                          ? 'Ese teléfono no parece real. Poné el tuyo: lo usamos para coordinar el pedido.'
+                          : 'Escribí tu teléfono completo, con código de área. Por ejemplo: 11 2345-6789.'}
                     </p>
                   )}
                 </div>

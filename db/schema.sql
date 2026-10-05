@@ -76,3 +76,8 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT NOT NULL DEFAULT
 -- Cuándo se confirmó el pedido desde el panel (NULL = pendiente). Sirve para
 -- contar después cuántos pedidos terminaron en venta.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
+
+-- Unidades que este renglón descontó del stock cuando se confirmó el pedido (0 = nada:
+-- pedido pendiente, o producto que no controla stock). Es lo que se devuelve al stock
+-- si el pedido vuelve a pendiente.
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS stock_taken INTEGER NOT NULL DEFAULT 0;

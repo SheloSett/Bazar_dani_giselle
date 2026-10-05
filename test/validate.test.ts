@@ -2,8 +2,10 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ORDER_TOKEN_RE,
+  checkCustomerPhone,
   parseCategoryName,
   parseCustomerName,
+  parseCustomerPhone,
   parseId,
   parseIdList,
   parseOptionalPrice,
@@ -141,6 +143,82 @@ describe('datos de quien pide', () => {
   test('teléfono: rechaza lo que no es un teléfono', () => {
     for (const v of ['', '1234567', 'no tengo', '11 4066 2350 int 3', '1'.repeat(16), ' '.repeat(50), 1140662350, null, undefined])
       assert.equal(parsePhone(v), null, String(v));
+  });
+});
+
+describe('teléfono de quien hace un pedido', () => {
+  test('acepta un número argentino escrito de cualquier forma y lo deja en 10 dígitos', () => {
+    for (const v of [
+      '11 4066-2350',
+      '1140662350',
+      '011 4066-2350',
+      '11 15 4066-2350',
+      '011 15 4066 2350',
+      '+54 9 11 4066-2350',
+      '54 11 4066 2350',
+      '0054 9 11 4066 2350',
+      '9 11 4066 2350',
+      '(011) 4066.2350',
+    ])
+      assert.equal(parseCustomerPhone(v), '1140662350', v);
+  });
+
+  test('acepta los códigos de área de 3 y 4 dígitos, con o sin 0 y 15', () => {
+    assert.equal(parseCustomerPhone('351 555-1234'), '3515551234');
+    assert.equal(parseCustomerPhone('0351 15 555-1234'), '3515551234');
+    assert.equal(parseCustomerPhone('+54 9 351 555 1234'), '3515551234');
+    assert.equal(parseCustomerPhone('2954 55-1234'), '2954551234');
+    assert.equal(parseCustomerPhone('02954 15 55-1234'), '2954551234');
+    assert.equal(parseCustomerPhone('221 498 7650'), '2214987650');
+  });
+
+  test('rechaza lo que no puede ser un teléfono: faltan números o el código de área', () => {
+    for (const v of [
+      '',
+      '211111111', // 9 dígitos: el que se coló en un pedido real
+      '4066-2350', // sin código de área
+      '15 4066-2350', // el 15 sin código de área
+      '11 4066-235',
+      '11 4066-23501',
+      '11 0066-2350', // un número no empieza con 0
+      '11 1066-2350', // ni con 1
+      '5555 40-2350', // ningún código de área empieza con 5
+      '1234567890',
+      '2040662350', // ni con 20
+      '3140662350', // ni con 31
+      '+1 415 555 2671', // de otro país
+      'no tengo',
+      '11 4066 2350 int 3',
+      '1'.repeat(41),
+      1140662350,
+      null,
+      undefined,
+    ])
+      assert.deepEqual(checkCustomerPhone(v), { ok: false, error: 'incompleto' }, String(v));
+  });
+
+  test('rechaza los que se notan inventados', () => {
+    for (const v of [
+      '11 2345-6789', // el ejemplo del formulario
+      '11 9876-5432',
+      '11 7890-1234',
+      '11 4444-4444',
+      '11 2222 2222',
+      '11 4545-4545',
+      '11 5000-0000',
+      '351 555-5555',
+      '341 234-5678',
+      '2222222222',
+      '3333 33-3333',
+    ])
+      assert.deepEqual(checkCustomerPhone(v), { ok: false, error: 'inventado' }, v);
+  });
+
+  test('un número real con algunos repetidos pasa', () => {
+    assert.equal(parseCustomerPhone('11 3655-7290'), '1136557290');
+    assert.equal(parseCustomerPhone('11 5555-1234'), '1155551234');
+    assert.equal(parseCustomerPhone('11 4000-0017'), '1140000017');
+    assert.equal(parseCustomerPhone('223 451-0099'), '2234510099');
   });
 });
 

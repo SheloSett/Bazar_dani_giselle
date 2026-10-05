@@ -12,8 +12,9 @@ import {
   IconTag,
 } from '@/components/icons';
 
-// Barra lateral del panel (en el celular pasa a ser una barra arriba)
-export function AdminNav() {
+// Barra lateral del panel (en el celular pasa a ser una barra arriba).
+// pendingOrders: pedidos sin confirmar, se muestran al lado de "Pedidos".
+export function AdminNav({ pendingOrders = 0 }: { pendingOrders?: number }) {
   const path = usePathname();
   // Productos abarca la lista, el alta y la edición
   const section = path.startsWith('/admin/settings')
@@ -35,8 +36,24 @@ export function AdminNav() {
         <Link href="/admin/categories" className="side-sub" aria-current={current('categories')}>
           <IconTag /> Categorías
         </Link>
-        <Link href="/admin/orders" aria-current={current('orders')}>
+        <Link
+          href="/admin/orders"
+          aria-current={current('orders')}
+          aria-label={
+            pendingOrders > 0
+              ? `Pedidos, ${pendingOrders} ${pendingOrders === 1 ? 'pendiente' : 'pendientes'}`
+              : undefined
+          }
+        >
           <IconBasket /> Pedidos
+          {pendingOrders > 0 && (
+            <span
+              className="side-count"
+              title={pendingOrders === 1 ? '1 pedido pendiente' : `${pendingOrders} pedidos pendientes`}
+            >
+              {pendingOrders}
+            </span>
+          )}
         </Link>
         <Link href="/admin/settings" aria-current={current('settings')}>
           <IconSliders /> Ajustes

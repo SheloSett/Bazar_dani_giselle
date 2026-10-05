@@ -98,13 +98,68 @@ export function parseCustomerName(value: unknown): string | null {
   return name.length >= 2 && name.length <= CUSTOMER_NAME_MAX ? name : null;
 }
 
-// Teléfono de quien pide: se puede escribir con espacios, guiones, paréntesis o +.
-// Devuelve solo los dígitos (de 8 a 15), o null si no parece un teléfono.
+// Un teléfono cualquiera (el WhatsApp del negocio, en Ajustes): se puede escribir con
+// espacios, guiones, paréntesis o +. Devuelve solo los dígitos (de 8 a 15), o null si
+// no parece un teléfono.
 export function parsePhone(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 40) return null;
   if (!/^[\d\s()+.-]+$/.test(value)) return null;
   const digits = value.replace(/\D/g, '');
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
+}
+
+// Por qué no sirve el teléfono de un pedido: le faltan números (o el código de área),
+// o se nota inventado
+export type PhoneError = 'incompleto' | 'inventado';
+export type PhoneCheck = { ok: true; phone: string } | { ok: false; error: PhoneError };
+
+// ¿Son números seguidos (2345678, 9876543, 7890123)?
+function isRun(digits: string): boolean {
+  let up = true;
+  let down = true;
+  for (let i = 1; i < digits.length; i++) {
+    const step = (Number(digits[i]) - Number(digits[i - 1]) + 10) % 10;
+    if (step !== 1) up = false;
+    if (step !== 9) down = false;
+  }
+  return up || down;
+}
+
+// Teléfono de quien hace un pedido: un número argentino con código de área. Se puede
+// escribir como salga (con +54, 9, 0, 15, espacios o guiones) y queda siempre igual:
+// los 10 dígitos de área + número (011 15 4066-2350 → 1140662350).
+// No puede saber si el número es de esa persona. Descarta lo que no puede ser un
+// teléfono (largo o código de área imposibles) y lo que se nota inventado (casi todo
+// el mismo número, o números seguidos como el del ejemplo del formulario).
+export function checkCustomerPhone(value: unknown): PhoneCheck {
+  const bad = (error: PhoneError): PhoneCheck => ({ ok: false, error });
+  if (typeof value !== 'string' || value.length > 40 || !/^[\d\s()+.-]+$/.test(value))
+    return bad('incompleto');
+
+  let d = value.replace(/\D/g, '');
+  // Lo que va antes del código de área: 00 y 54 (país), el 9 de los celulares y el 0
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.length > 10 && d.startsWith('54')) d = d.slice(2);
+  if (d.length > 10 && d.startsWith('9')) d = d.slice(1);
+  if (d.length > 10 && d.startsWith('0')) d = d.slice(1);
+  // El 15 de los celulares va después del área, que tiene 2, 3 o 4 dígitos
+  if (d.length === 12) {
+    const at = d.startsWith('11') ? 2 : d.startsWith('15', 3) ? 3 : 4;
+    if (d.startsWith('15', at)) d = d.slice(0, at) + d.slice(at + 2);
+  }
+
+  // Área + número son 10 dígitos. El área es 11 o empieza con 2 o 3 (nunca 20, 21, 30
+  // ni 31), y un número de Buenos Aires no empieza con 0 ni con 1.
+  if (!/^(?:11[2-9]\d{7}|[23][2-9]\d{8})$/.test(d)) return bad('incompleto');
+
+  if (new Set(d.slice(2)).size < 3 || isRun(d.slice(3))) return bad('inventado');
+  return { ok: true, phone: d };
+}
+
+// Lo mismo, cuando solo importa el número: los 10 dígitos, o null
+export function parseCustomerPhone(value: unknown): string | null {
+  const check = checkCustomerPhone(value);
+  return check.ok ? check.phone : null;
 }
 
 // ---------- reordenamiento (orden manual de productos y categorías) ----------

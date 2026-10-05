@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/session';
 import { formatOrderDate, getAdminOrder } from '@/lib/orders';
 import { money, thumbUrl } from '@/lib/catalog';
+import { unitsLeft } from '@/lib/order-rules';
 import { parseId } from '@/lib/validate';
 import { IconPhoto } from '@/components/icons';
 import { PrintButton } from '@/components/PrintButton';
@@ -25,13 +26,14 @@ export default async function OrderDetailPage({
   if (!order) notFound();
 
   const units = order.items.reduce((sum, i) => sum + i.quantity, 0);
+  const confirmed = order.confirmed_at !== null;
 
   return (
     <>
       <div className="adm-top">
         <h1>{`Pedido #${order.id}`}</h1>
         <div className="ord-actions no-print">
-          <ConfirmOrderButton id={order.id} confirmed={order.confirmed_at !== null} />
+          <ConfirmOrderButton id={order.id} confirmed={confirmed} />
           <OrderWhatsApp
             id={order.id}
             name={order.customer_name}
@@ -39,7 +41,7 @@ export default async function OrderDetailPage({
             label="Escribir por WhatsApp"
           />
           <PrintButton />
-          <DeleteOrderButton id={order.id} />
+          <DeleteOrderButton id={order.id} confirmed={confirmed} />
         </div>
       </div>
       <p className="section-note">
@@ -64,6 +66,17 @@ export default async function OrderDetailPage({
                 <span className="ord-nm">
                   <strong>{item.name}</strong>
                   <small>{`${item.quantity} × ${money(item.price)}`}</small>
+                  {/* confirmado: lo que descontó; pendiente: aviso si hoy no alcanza */}
+                  {confirmed && item.stock_taken > 0 && (
+                    <small className="ord-stock no-print">
+                      {`Descontó ${item.stock_taken} del stock`}
+                    </small>
+                  )}
+                  {!confirmed && item.stock !== null && item.stock < item.quantity && (
+                    <small className="ord-stock short no-print">
+                      {`No alcanza el stock: ${unitsLeft(item.stock)}`}
+                    </small>
+                  )}
                 </span>
                 <span className="ord-sub">{money(item.price * item.quantity)}</span>
               </li>
@@ -74,6 +87,11 @@ export default async function OrderDetailPage({
             <strong>{money(order.total)}</strong>
           </div>
           <p className="card-note">Precios al momento de armar el pedido.</p>
+          {!confirmed && (
+            <p className="card-note no-print">
+              Al confirmarlo, sus unidades se descuentan del stock de cada producto.
+            </p>
+          )}
         </section>
 
         <aside className="pform-side">

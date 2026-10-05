@@ -4,8 +4,8 @@ import { clientIp, orderLimiter } from '@/lib/rate-limit';
 import {
   ORDER_TOKEN_RE,
   parseCustomerName,
+  parseCustomerPhone,
   parseOrderItems,
-  parsePhone,
 } from '@/lib/validate';
 
 // Guarda el pedido que alguien arma en el catálogo: queda en el panel y el
@@ -36,12 +36,13 @@ export async function POST(req: NextRequest) {
   if (!token || !items)
     return NextResponse.json({ error: 'Pedido inválido' }, { status: 400 });
 
-  // Nombre y teléfono de quien pide: obligatorios
+  // Nombre y teléfono de quien pide: obligatorios. El teléfono tiene que ser un
+  // número argentino con código de área, y se guarda siempre con sus 10 dígitos.
   const name = parseCustomerName(body?.customer?.name);
-  const phone = parsePhone(body?.customer?.phone);
+  const phone = parseCustomerPhone(body?.customer?.phone);
   if (!name || !phone)
     return NextResponse.json(
-      { error: 'Faltan el nombre y un teléfono válido' },
+      { error: 'Faltan el nombre y un teléfono válido, con código de área' },
       { status: 400 }
     );
 

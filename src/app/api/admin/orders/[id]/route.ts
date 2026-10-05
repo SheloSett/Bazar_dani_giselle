@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/session';
-import { deleteOrder, setOrderConfirmed } from '@/lib/orders';
+import { confirmOrder, deleteOrder, unconfirmOrder } from '@/lib/orders';
 import { parseId } from '@/lib/validate';
 
 type Params = { params: Promise<{ id: string }> };
 
-// Marcar o desmarcar el pedido como confirmado: { confirmed: true | false }
+// Marcar o desmarcar el pedido como confirmado: { confirmed: true | false }.
+// Confirmar descuenta el stock; si no alcanza responde 409 con los productos que
+// faltan, y con { force: true } confirma igual. Desmarcar devuelve lo descontado.
 export async function PATCH(req: NextRequest, { params }: Params) {
   if (!(await isAdmin()))
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -16,8 +18,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (typeof body?.confirmed !== 'boolean')
     return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
 
-  if (!(await setOrderConfirmed(id, body.confirmed)))
+  if (!body.confirmed) {
+    if (!(await unconfirmOrder(id)))
+      return NextResponse.json({ error: 'No existe' }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+
+  const result = await confirmOrder(id, body.force === true);
+  if (result.status === 'missing')
     return NextResponse.json({ error: 'No existe' }, { status: 404 });
+  if (result.status === 'short')
+    return NextResponse.json(
+      { error: 'No alcanza el stock', short: result.short },
+      { status: 409 }
+    );
   return NextResponse.json({ ok: true });
 }
 

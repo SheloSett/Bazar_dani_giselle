@@ -43,7 +43,8 @@ Además de nombre, precio, categoría y fotos, cada producto tiene dos campos op
   tachado con el porcentaje de descuento.
 - **Stock**: vacío = no se controla. Con 0 el producto aparece como "Sin stock" (se
   puede consultar pero no sumar al pedido); con 3 o menos avisa que quedan pocas
-  unidades. El pedido nunca supera las unidades disponibles.
+  unidades. El pedido nunca supera las unidades disponibles. Al **confirmar un pedido**
+  en el panel, sus unidades se descuentan solas (ver Pedidos).
 
 La búsqueda ignora tildes y mayúsculas ("cafe" encuentra "Cafetera").
 
@@ -95,7 +96,11 @@ guarda el pedido (tablas `orders` y `order_items`) y esa página lo muestra con 
 de cada producto, cantidades y total, con un botón para imprimirlo o guardarlo en PDF.
 
 Para pedir hay que dejar **nombre y teléfono** (obligatorios: sin eso no se envía, y
-el servidor también los exige). Todos los pedidos quedan en el panel, en **Pedidos**:
+el servidor también los exige). El teléfono tiene que ser un número argentino con
+código de área: se acepta escrito de cualquier forma (+54, 9, 0, 15, espacios) y se
+guarda con sus 10 dígitos. Se rechazan los que no pueden existir (largo o código de
+área imposibles) y los que se notan inventados (todo el mismo número, 2345-6789). No
+se verifica que el número sea de esa persona: eso requeriría mandarle un código. Todos los pedidos quedan en el panel, en **Pedidos**:
 lista con cliente, teléfono y total, y un detalle con fotos, botón para escribirle al
 cliente por WhatsApp, imprimir o eliminar.
 
@@ -105,7 +110,7 @@ cliente por WhatsApp, imprimir o eliminar.
 - Se guarda nombre, precio y foto de cada producto como estaban al pedir; si el
   producto cambia después, el pedido no. Los precios los pone el servidor.
 - El pedido se guarda al tocar el botón: si la persona después no manda el mensaje,
-  queda igual en la lista. No descuenta stock: sigue siendo un pedido a confirmar.
+  queda igual en la lista. Hacer el pedido no descuenta stock: queda **Pendiente**.
 - Reenviar el mismo pedido no lo duplica: el mismo carrito con los mismos datos
   reusa el mismo link (aunque se recargue la página), y además el servidor no
   guarda dos veces el mismo teléfono con exactamente los mismos productos y
@@ -113,6 +118,16 @@ cliente por WhatsApp, imprimir o eliminar.
 - Cada pedido tiene su estado en el panel: **Pendiente / Confirmado** (con la fecha
   de confirmación guardada, para contar más adelante cuántos terminaron en venta), y
   un tachito para eliminarlo directo desde la lista.
+- **Stock automático**: al tocar **Confirmar** (la venta se hizo) se descuentan las
+  unidades de cada producto que controla stock; cada renglón guarda lo que descontó
+  (`order_items.stock_taken`). Si de algún producto no alcanza, el panel avisa de
+  cuál y pregunta antes de confirmar igual (el stock no baja de 0). Volver el pedido
+  a pendiente devuelve esas unidades. Eliminar un pedido confirmado **no** las
+  devuelve (ya se vendió): si la venta se canceló, primero se lo vuelve a pendiente.
+- **Recordatorio de pendientes**: el menú del panel muestra cuántos pedidos siguen
+  sin confirmar, la lista los pone primero, y si alguno espera hace más de un día
+  aparece un aviso arriba de todas las pantallas del panel hasta que se lo confirma
+  o se lo elimina.
 - Si el guardado falla, el catálogo avisa y el mensaje igual lleva el detalle en texto.
 - Límites de la ruta pública: cuerpo de 20 KB, 100 productos, 12 pedidos por IP y 240
   en total cada 10 minutos.

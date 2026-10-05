@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/session';
 import { formatOrderDateShort, listOrders } from '@/lib/orders';
 import { money } from '@/lib/catalog';
+import { waitingLabel } from '@/lib/order-rules';
 import { OrderWhatsApp } from '@/components/admin/OrderWhatsApp';
 import { ConfirmOrderButton } from '@/components/admin/ConfirmOrderButton';
 import { DeleteOrderButton } from '@/components/admin/DeleteOrderButton';
@@ -21,16 +22,18 @@ export default async function OrdersPage() {
         <h1>Pedidos</h1>
       </div>
       <p className="section-note">
-        Se guardan cuando alguien toca “Enviar pedido por WhatsApp” en el catálogo. Si la
-        persona después no manda el mensaje, el pedido queda igual en esta lista.
+        Se guardan cuando alguien toca “Enviar pedido por WhatsApp” en el catálogo, aunque
+        después no mande el mensaje. Cuando un pedido se cobra, tocá{' '}
+        <strong>Confirmar</strong>: sus unidades se descuentan del stock. Si no se concretó,
+        eliminalo.
       </p>
-      <table className="tbl">
+      {/* en el celular cada fila pasa a ser una tarjeta (tbl-orders en globals.css) */}
+      <table className="tbl tbl-orders">
         <thead>
           <tr>
             <th>Pedido</th>
             <th>Fecha</th>
             <th>Cliente</th>
-            <th>Teléfono</th>
             <th>Unidades</th>
             <th>Total</th>
             <th>Estado</th>
@@ -40,30 +43,37 @@ export default async function OrdersPage() {
         <tbody>
           {orders.length === 0 && (
             <tr>
-              {/* colSpan era 7: se le suma 1 por la columna nueva de Estado */}
-              <td colSpan={8} className="empty">
+              <td colSpan={7} className="empty">
                 Todavía no hay pedidos.
               </td>
             </tr>
           )}
           {orders.map((o) => (
             <tr key={o.id}>
-              <td>
+              <td className="c-id">
                 <Link href={`/admin/orders/${o.id}`}>{`#${o.id}`}</Link>
               </td>
-              <td>{formatOrderDateShort(o.created_at)}</td>
-              <td>{o.customer_name || '—'}</td>
-              <td>{o.customer_phone || '—'}</td>
-              <td>{o.units}</td>
-              <td className="price-cell">{money(o.total)}</td>
-              <td>
+              <td className="c-date">
+                {formatOrderDateShort(o.created_at)}
+                {/* solo los pendientes "esperan": de esos se muestra hace cuánto */}
+                {o.confirmed_at === null && (
+                  <small className="ord-wait">{waitingLabel(o.waiting_days)}</small>
+                )}
+              </td>
+              <td className="c-who">
+                {o.customer_name || '—'}
+                {o.customer_phone && <small>{o.customer_phone}</small>}
+              </td>
+              <td className="c-units">{o.units}</td>
+              <td className="price-cell c-total">{money(o.total)}</td>
+              <td className="c-state">
                 <ConfirmOrderButton id={o.id} confirmed={o.confirmed_at !== null} />
               </td>
-              <td>
+              <td className="c-actions">
                 <div className="row-actions">
                   <OrderWhatsApp id={o.id} name={o.customer_name} phone={o.customer_phone} />
                   <Link href={`/admin/orders/${o.id}`}>Ver</Link>
-                  <DeleteOrderButton id={o.id} compact />
+                  <DeleteOrderButton id={o.id} compact confirmed={o.confirmed_at !== null} />
                 </div>
               </td>
             </tr>

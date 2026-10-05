@@ -579,6 +579,9 @@ img { max-width: 100%; }
 .ord-nm { flex: 1; min-width: 0; }
 .ord-nm strong { display: block; font-weight: 600; line-height: 1.3; }
 .ord-nm small { color: var(--soft); font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+/* panel: lo que el renglón descontó del stock, o el aviso de que no alcanza */
+.ord-nm .ord-stock { display: block; font-size: 0.8rem; }
+.ord-nm .ord-stock.short { color: #a3271f; font-weight: 600; }
 .ord-sub { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ord-total {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -645,6 +648,11 @@ img { max-width: 100%; }
   .adm-side a:hover, .adm-side button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 }
 .adm-side a[aria-current="page"] { background: #fff; color: #123d2e; }
+/* cuántos pedidos siguen pendientes, al lado de "Pedidos" */
+.side-count {
+  margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 999px;
+  background: #f2b632; color: #3a2a00; font-size: 0.76rem; font-weight: 800; text-align: center;
+}
 /* sub-ítem (Categorías, dentro de Productos) */
 .adm-side .side-sub { padding-left: 34px; font-size: 0.88rem; }
 .adm-side .side-sub .ic { width: 1.05em; height: 1.05em; }
@@ -670,6 +678,15 @@ img { max-width: 100%; }
     clip-path: inset(50%); white-space: nowrap;
   }
 }
+
+/* recordatorio de pedidos pendientes, arriba de cada pantalla del panel */
+.adm-alert {
+  display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap;
+  background: #fff6dd; border: 1px solid #f0d58a; color: #5c4300; border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 22px; font-size: 0.9rem; line-height: 1.45;
+}
+.adm-alert p { margin: 0; flex: 1 1 340px; }
+.adm-alert a { font-weight: 700; color: #5c4300; white-space: nowrap; }
 
 .adm h1 { font-weight: 800; letter-spacing: -0.02em; font-size: 1.6rem; margin: 0 0 18px; }
 .adm h2 {
@@ -771,6 +788,35 @@ img { max-width: 100%; }
 .pill.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 .pill.out { background: #fbeaea; border-color: #f3c9c6; color: #a3271f; }
 .pill.low { color: #a3271f; }
+/* pedido pendiente: llama la atención hasta que se confirma */
+.pill.wait { background: #fff6dd; border-color: #f0d58a; color: #7a5900; }
+/* estado de un pedido: la pastilla y, si está pendiente, el botón para confirmarlo */
+.ord-state { display: inline-flex; align-items: center; gap: 8px; }
+.tbl .ord-wait { display: block; color: #7a5900; font-size: 0.78rem; font-weight: 600; }
+/* lista de pedidos */
+.tbl-orders .c-date { white-space: nowrap; }
+.tbl-orders .c-who small { display: block; color: var(--soft); font-size: 0.82rem; }
+@media (max-width: 760px) {
+  /* en el celular cada pedido es una tarjeta: no hay que deslizar de costado para confirmarlo */
+  .tbl-orders, .tbl-orders tbody { display: block; }
+  .tbl-orders thead, .tbl-orders .c-units { display: none; }
+  .tbl-orders tr {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: baseline;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .tbl-orders td { display: block; padding: 0; border: 0; }
+  /* arriba: número, fecha y total; abajo, de a una fila: cliente, estado y acciones */
+  .tbl-orders .c-id { grid-area: 1 / 1; }
+  .tbl-orders .c-date { grid-area: 1 / 2; color: var(--soft); font-size: 0.86rem; white-space: normal; }
+  .tbl-orders .c-date .ord-wait { display: inline; margin-left: 6px; }
+  .tbl-orders .c-total { grid-area: 1 / 3; }
+  .tbl-orders .c-who { grid-area: 2 / 1 / auto / -1; font-weight: 600; }
+  .tbl-orders .c-state { grid-area: 3 / 1 / auto / -1; }
+  .tbl-orders .c-actions { grid-area: 4 / 1 / auto / -1; }
+  .tbl-orders .empty { grid-column: 1 / -1; }
+  .tbl-orders .c-who small { display: inline; margin-left: 8px; font-weight: 400; }
+  .tbl-orders .row-actions { justify-content: flex-start; }
+}
 
 .fld { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .fld label { font-size: 0.82rem; font-weight: 700; }
