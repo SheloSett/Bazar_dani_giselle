@@ -56,6 +56,8 @@ export interface Settings extends TextSettings {
   // Logo del negocio (archivo en uploads). null = se muestra el nombre como texto.
   // No es un ajuste de texto: se cambia subiendo una imagen (setLogo).
   logo: string | null;
+  // El logo es cuadrado o redondo: en los encabezados va con el nombre al lado
+  logo_with_name: boolean;
 }
 
 export const SETTING_KEYS: (keyof TextSettings)[] = [
@@ -72,6 +74,7 @@ export const SETTING_KEYS: (keyof TextSettings)[] = [
 ];
 
 const LOGO_KEY = 'logo';
+const LOGO_NAME_KEY = 'logo_with_name';
 
 // Lo que vale mientras el panel no lo cambie. Los beneficios arrancan con los textos
 // que antes estaban fijos en el código.
@@ -87,6 +90,7 @@ const SETTINGS_DEFAULTS: Settings = {
   perk3_title: 'Pedido por WhatsApp',
   perk3_text: 'Armás la lista y la enviás en un toque',
   logo: null,
+  logo_with_name: false,
 };
 
 // ---------- settings ----------
@@ -99,6 +103,8 @@ export async function getSettings(): Promise<Settings> {
   for (const r of rows) {
     if (r.key === LOGO_KEY) {
       s.logo = r.value || null;
+    } else if (r.key === LOGO_NAME_KEY) {
+      s.logo_with_name = r.value === '1';
     } else if ((SETTING_KEYS as string[]).includes(r.key)) {
       s[r.key as keyof TextSettings] = r.value;
     }
@@ -106,19 +112,23 @@ export async function getSettings(): Promise<Settings> {
   return s;
 }
 
-// Cambia (o quita, con null) el logo. Devuelve el archivo anterior, para borrarlo del disco.
-export async function setLogo(filename: string | null): Promise<string | null> {
+// Cambia (o quita, con null) el logo. withName: es cuadrado o redondo y va con el
+// nombre al lado. Devuelve el archivo anterior, para borrarlo del disco.
+export async function setLogo(
+  filename: string | null,
+  withName = false
+): Promise<string | null> {
   const old = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [
     LOGO_KEY,
   ]);
   if (filename) {
     await query(
-      `INSERT INTO settings (key, value) VALUES ($1, $2)
+      `INSERT INTO settings (key, value) VALUES ($1, $2), ($3, $4)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [LOGO_KEY, filename]
+      [LOGO_KEY, filename, LOGO_NAME_KEY, withName ? '1' : '0']
     );
   } else {
-    await query('DELETE FROM settings WHERE key = $1', [LOGO_KEY]);
+    await query('DELETE FROM settings WHERE key = ANY($1)', [[LOGO_KEY, LOGO_NAME_KEY]]);
   }
   return old[0]?.value || null;
 }

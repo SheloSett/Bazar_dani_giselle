@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/session';
 import { setLogo } from '@/lib/data';
-import { removePhotoFile, savePhoto } from '@/lib/uploads';
+import { logoNeedsName, photoSize, removePhotoFile, savePhoto } from '@/lib/uploads';
 
-// Logo del negocio: se muestra en el encabezado del catálogo en lugar del nombre
-// y como ícono de la pestaña. Pasa por el mismo procesado que las fotos.
+// Logo del negocio: se muestra en el encabezado del catálogo y como ícono de la
+// pestaña. Pasa por el mismo procesado que las fotos. Uno apaisado reemplaza al
+// nombre; uno cuadrado o redondo va con el nombre al lado (a ese tamaño no se lee).
 
 export async function POST(req: NextRequest) {
   if (!(await isAdmin()))
@@ -23,7 +24,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  const old = await setLogo(filename);
+  const size = await photoSize(filename);
+  const old = await setLogo(filename, size ? logoNeedsName(size.width, size.height) : true);
   if (old) await removePhotoFile(old);
   return NextResponse.json({ logo: filename });
 }

@@ -90,9 +90,10 @@ export function LogoForm({ initial, shopName }: { initial: string | null; shopNa
         </div>
       </div>
       <p className="section-note" style={{ marginTop: 12 }}>
-        JPG, PNG, WebP o AVIF, hasta 8 MB. Lo ideal es un PNG con fondo transparente y más
-        ancho que alto. Se muestra en el encabezado del catálogo en lugar del nombre, en los
-        pedidos, en el catálogo para imprimir y como ícono de la pestaña del navegador.
+        JPG, PNG, WebP o AVIF, hasta 8 MB. Lo ideal es un PNG con fondo transparente. Si es
+        más ancho que alto, reemplaza al nombre en el encabezado; si es cuadrado o redondo,
+        va con el nombre al lado. También se usa en los pedidos, en el catálogo para imprimir
+        y como ícono de la pestaña del navegador.
       </p>
     </div>
   );

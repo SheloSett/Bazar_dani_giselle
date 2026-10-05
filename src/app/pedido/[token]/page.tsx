@@ -63,7 +63,7 @@ export default async function OrderPage({ params }: Props) {
   return (
     <main className="ord">
       <div className="ord-top">
-        <Brand name={settings.shop_name} logo={settings.logo} />
+        <Brand name={settings.shop_name} logo={settings.logo} withName={settings.logo_with_name} />
         <PrintButton />
       </div>
 

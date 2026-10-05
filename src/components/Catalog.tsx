@@ -372,7 +372,7 @@ export function Catalog({
     <>
       <header className="site-header">
         <div className="header-in">
-          <Brand name={settings.shop_name} logo={settings.logo} />
+          <Brand name={settings.shop_name} logo={settings.logo} withName={settings.logo_with_name} />
           <button
             className="btn-cart"
             onClick={() => setCartOpen(true)}

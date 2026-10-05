@@ -21,7 +21,7 @@ export function LegalPage({
     <main className="ord legal">
       <div className="ord-top">
         <Link href="/" aria-label={`${settings.shop_name}: ir al catálogo`}>
-          <Brand name={settings.shop_name} logo={settings.logo} />
+          <Brand name={settings.shop_name} logo={settings.logo} withName={settings.logo_with_name} />
         </Link>
         <Link className="ord-back no-print" href="/">
           Ver el catálogo

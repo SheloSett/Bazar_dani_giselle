@@ -89,6 +89,29 @@ export async function savePhoto(file: File): Promise<string> {
   return filename;
 }
 
+// Un logo cuadrado o redondo queda chico en el encabezado y no se llega a leer: se
+// muestra con el nombre del negocio al lado. Uno apaisado (bastante más ancho que
+// alto) ya es el nombre, y va solo. Si no se pudo medir, con nombre.
+export const LOGO_WIDE_RATIO = 1.6;
+
+export function logoNeedsName(width: number, height: number): boolean {
+  if (!(width > 0 && height > 0)) return true;
+  return width / height < LOGO_WIDE_RATIO;
+}
+
+// Ancho y alto de una foto ya guardada (el nombre que devuelve savePhoto), o null
+export async function photoSize(
+  filename: string
+): Promise<{ width: number; height: number } | null> {
+  if (!isSafeFilename(filename)) return null;
+  try {
+    const meta = await sharp(await fs.readFile(path.join(UPLOAD_DIR, filename))).metadata();
+    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function removePhotoFile(filename: string): Promise<void> {
   if (!isSafeFilename(filename)) return;
   await Promise.all(

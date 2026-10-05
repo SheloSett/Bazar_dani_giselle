@@ -65,9 +65,11 @@ título y aclaración, y el que queda sin título no se muestra.
 ## Logo
 
 En **Ajustes → Logo** se sube la imagen del negocio (JPG, PNG, WebP o AVIF; lo ideal
-es un PNG con fondo transparente, más ancho que alto). Cuando hay logo, reemplaza al
-nombre en el encabezado del catálogo y de los pedidos, y aparece en el catálogo para
-imprimir; el pie sigue mostrando el nombre como texto. Pasa por el mismo procesado
+es un PNG con fondo transparente). Un logo apaisado (más ancho que alto) reemplaza al
+nombre en el encabezado del catálogo, de los pedidos y de las páginas legales; uno
+cuadrado o redondo va con el nombre al lado, porque a ese tamaño no se lee (se decide
+solo al subirlo, según sus medidas). También aparece en el catálogo para imprimir; el
+pie sigue mostrando el nombre como texto. Pasa por el mismo procesado
 que las fotos, y al cambiarlo o quitarlo se borra el archivo anterior.
 
 El ícono de la pestaña del navegador (`/icono.png`) sale del logo; si no hay logo,

@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import {
   detectImageExt,
   isSafeFilename,
+  logoNeedsName,
   mimeForFilename,
   processPhoto,
   shareImage,
@@ -100,5 +101,23 @@ describe('nombres de archivo servibles', () => {
       assert.equal(isSafeFilename(name), false, name);
       assert.equal(mimeForFilename(name), null, name);
     }
+  });
+});
+
+describe('logo: con o sin el nombre al lado', () => {
+  test('uno cuadrado o redondo va con el nombre', () => {
+    assert.equal(logoNeedsName(850, 850), true);
+    assert.equal(logoNeedsName(600, 500), true);
+    assert.equal(logoNeedsName(400, 700), true);
+  });
+
+  test('uno apaisado va solo: ya es el nombre', () => {
+    assert.equal(logoNeedsName(1200, 400), false);
+    assert.equal(logoNeedsName(800, 500), false);
+  });
+
+  test('si no se pudo medir, con el nombre', () => {
+    assert.equal(logoNeedsName(0, 0), true);
+    assert.equal(logoNeedsName(NaN, 300), true);
   });
 });
