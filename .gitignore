@@ -2,6 +2,8 @@ node_modules/
 .next/
 out/
 /uploads/
+# copias de la base y las fotos que deja scripts/backup.sh (tienen datos de clientes)
+/backups/
 .env
 .env.local
 *.tsbuildinfo

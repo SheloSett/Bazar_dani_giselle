@@ -130,9 +130,9 @@ npm run admin:reset                                        # en local
 ## Deploy en el VPS (sin dominio, para probar)
 
 ```bash
-# en el VPS (ej: /srv/bazar-catalogo)
-git clone <repo> /srv/bazar-catalogo   # o subir la carpeta por scp
-cd /srv/bazar-catalogo
+# en el VPS (el deploy actual está en /home/shelo/Bazar_dani_giselle)
+git clone <repo>          # crea la carpeta Bazar_dani_giselle
+cd Bazar_dani_giselle
 
 # crear .env solo con las claves (docker-compose las inyecta y no
 # arranca si faltan):
@@ -166,8 +166,13 @@ docker compose run --rm -u root app chown -R node:node /app/uploads
 Para que corra solo todas las noches, en el VPS (`crontab -e`):
 
 ```
-0 4 * * * cd /srv/bazar-catalogo && ./scripts/backup.sh >> backups/backup.log 2>&1
+0 4 * * * cd /home/shelo/Bazar_dani_giselle && mkdir -p backups && ./scripts/backup.sh >> backups/backup.log 2>&1
 ```
+
+La ruta es la carpeta del proyecto en el VPS (cambiarla si está en otro lado). El
+`mkdir -p backups` va antes porque el log se abre antes de que corra el script: sin
+la carpeta, cron no llega a ejecutarlo y no avisa. `backups/` está fuera de git y
+del build de Docker (`.gitignore` y `.dockerignore`): tiene datos de clientes.
 
 Conviene bajarse la carpeta `backups/` cada tanto (o copiarla a otro lado), por si
 se pierde el VPS entero. Para restaurar:

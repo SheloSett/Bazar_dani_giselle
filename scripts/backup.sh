@@ -4,8 +4,10 @@
 # Correrlo parado en la carpeta del proyecto (donde está docker-compose.yml):
 #   ./scripts/backup.sh
 #
-# Programado todas las noches a las 04:00 con cron (crontab -e):
-#   0 4 * * * cd /srv/bazar-catalogo && ./scripts/backup.sh >> backups/backup.log 2>&1
+# Programado todas las noches a las 04:00 con cron (crontab -e). La ruta es la
+# carpeta del proyecto en el VPS; el mkdir va antes porque el log se abre antes
+# de que corra el script, y sin la carpeta cron no llega a ejecutarlo:
+#   0 4 * * * cd /home/shelo/Bazar_dani_giselle && mkdir -p backups && ./scripts/backup.sh >> backups/backup.log 2>&1
 #
 # Guarda en ./backups y borra lo que tenga más de BACKUP_KEEP_DAYS días (14 por
 # defecto). Conviene copiar la carpeta backups/ también fuera del VPS cada tanto.
