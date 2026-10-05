@@ -101,6 +101,11 @@ export default async function OrderPage({ params }: Props) {
       <Link className="ord-back no-print" href="/">
         Ver el catálogo
       </Link>
+      <p className="ord-legal no-print">
+        <Link href="/terminos">Términos y condiciones</Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/privacidad">Política de privacidad</Link>
+      </p>
     </main>
   );
 }

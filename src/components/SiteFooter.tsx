@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { Settings } from '@/lib/data';
 import { IconInstagram, IconWhatsApp } from '@/components/icons';
 
@@ -59,6 +60,11 @@ export function SiteFooter({
       {/* antes era un <p className="foot-bottom"> con solo el ©: pasa a <div>
           para sumarle la línea de créditos del desarrollador */}
       <div className="foot-bottom">
+        <p className="foot-legal">
+          <Link href="/terminos">Términos y condiciones</Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/privacidad">Política de privacidad</Link>
+        </p>
         <p>
           © {new Date().getFullYear()} {settings.shop_name}
         </p>

@@ -88,6 +88,16 @@ nombre del negocio, el título y la primera foto del catálogo (servida en JPEG 
 `/og/…`, porque WhatsApp no muestra WebP). Si el sitio está detrás de un proxy que
 no manda `X-Forwarded-Host`/`X-Forwarded-Proto`, configurar `SITE_URL` en el `.env`.
 
+## Términos y privacidad
+
+El sitio tiene dos páginas de texto legal, enlazadas desde el pie del catálogo, el
+formulario del pedido ("Al enviar el pedido aceptás…") y la página de cada pedido:
+`/terminos` (Términos y condiciones) y `/privacidad` (Política de privacidad). Los
+textos están en `src/lib/legal.ts` y usan el nombre del negocio cargado en Ajustes.
+Describen lo que el sitio hace hoy (pide nombre y teléfono, no cobra, el pedido se
+cierra por WhatsApp): si eso cambia, hay que actualizarlos ahí, junto con la fecha
+(`LEGAL_UPDATED`). Son un punto de partida razonable, no asesoramiento legal.
+
 ## Pedidos
 
 WhatsApp no deja adjuntar fotos desde un link, así que el mensaje del pedido lleva un

@@ -618,6 +618,18 @@ export function Catalog({
                 </div>
                 <p className="pv-label">Así llega el mensaje al negocio:</p>
                 <div className="preview">{orderMessage()}</div>
+                {/* se abren en otra pestaña para no perder el pedido que se está armando */}
+                <p className="who-legal">
+                  Al enviar el pedido aceptás los{' '}
+                  <a href="/terminos" target="_blank" rel="noopener">
+                    Términos y condiciones
+                  </a>{' '}
+                  y la{' '}
+                  <a href="/privacidad" target="_blank" rel="noopener">
+                    Política de privacidad
+                  </a>
+                  .
+                </p>
                 <div className="actions">
                   <a
                     className="btn btn-wa"

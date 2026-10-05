@@ -363,6 +363,9 @@ img { max-width: 100%; }
    grandes (antes iban apagados a rgba .45, sin centrar y al tamaño del ©) */
 .foot-bottom { text-align: center; }
 .foot-bottom p { margin: 0; }
+.foot-bottom .foot-legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin-bottom: 10px; font-size: 0.86rem; }
+.foot-legal a { color: #fff; text-decoration: none; }
+@media (hover: hover) { .foot-legal a:hover { text-decoration: underline; } }
 .foot-credit {
   margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: 4px 12px; font-size: 0.95rem; font-weight: 600; color: rgba(255, 255, 255, 0.82);
@@ -590,6 +593,24 @@ img { max-width: 100%; }
 .ord-total strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .ord-note { color: var(--soft); font-size: 0.86rem; margin: 6px 0 22px; }
 .ord-back { color: var(--accent); font-weight: 600; text-decoration: none; }
+/* ---------- términos y condiciones, política de privacidad ---------- */
+.legal h2 { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; margin: 28px 0 6px; }
+.legal p, .legal li { color: #44474b; font-size: 0.95rem; line-height: 1.6; }
+.legal section p { margin: 8px 0 0; }
+.legal ul { margin: 8px 0 0; padding-left: 20px; }
+.legal li { margin: 3px 0; }
+.legal .ord-top a { text-decoration: none; color: inherit; }
+.legal .ord-top .ord-back { color: var(--accent); }
+.legal-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px;
+  margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--line);
+}
+.legal-foot .btn { display: inline-flex; }
+.legal-foot a:not(.btn) { color: var(--accent); font-weight: 600; }
+/* los links a esos textos: al pie del pedido y en el formulario del catálogo */
+.ord-legal { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 22px 0 0; font-size: 0.82rem; color: var(--soft); }
+.ord-legal a, .who-legal a { color: inherit; text-decoration: underline; }
+.who-legal { margin: 0 0 12px; font-size: 0.78rem; line-height: 1.45; color: var(--soft); }
 /* páginas de "no encontrado" y de error */
 .oops { padding-top: 90px; text-align: center; }
 .oops .ord-meta { margin-bottom: 26px; }
