@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite, isAdmin } from '@/lib/session';
 import {
   deleteProduct,
   getAdminProduct,
@@ -23,8 +23,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ error: 'No existe' }, { status: 404 });
 
@@ -84,9 +84,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ error: 'No existe' }, { status: 404 });
   const filenames = await deleteProduct(id);

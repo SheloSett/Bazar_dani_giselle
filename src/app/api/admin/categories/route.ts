@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite, isAdmin } from '@/lib/session';
 import { createCategory, listCategories, reorderCategories } from '@/lib/data';
 import { CATEGORY_NAME_MAX, parseCategoryName, parseIdList } from '@/lib/validate';
 
@@ -10,8 +10,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const body = await req.json().catch(() => null);
   const name = parseCategoryName(body?.name);
   if (!name)
@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
 
 // Nuevo orden de los rubros: { order: [ids…] }, como se ven en el catálogo
 export async function PATCH(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const order = parseIdList(body?.order);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite } from '@/lib/session';
 import { setCategoryPhoto } from '@/lib/data';
 import { removePhotoFile, savePhoto } from '@/lib/uploads';
 import { parseId } from '@/lib/validate';
@@ -9,8 +9,8 @@ import { parseId } from '@/lib/validate';
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ error: 'No existe' }, { status: 404 });
 
@@ -37,9 +37,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 }
 
 // Quitar la foto propia: el rubro vuelve a usar la del primer producto
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ error: 'No existe' }, { status: 404 });
 

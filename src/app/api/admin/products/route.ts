@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite, isAdmin } from '@/lib/session';
 import { createProduct, listAdminProducts, reorderProducts } from '@/lib/data';
 import { isForeignKeyViolation } from '@/lib/db';
 import {
@@ -17,8 +17,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
 // Nuevo orden de los productos de un rubro: { order: [ids…] }. Tienen que ser
 // exactamente todos los productos de un mismo rubro (o todos los sin rubro).
 export async function PATCH(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const order = parseIdList(body?.order);

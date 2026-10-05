@@ -275,7 +275,11 @@ el proxy.
 - El optimizador de imágenes de Next (`/_next/image`) está cerrado: el sitio no lo
   usa y abierto permitía gastarle procesador y disco al servidor.
 - Las rutas del panel que cambian algo solo aceptan pedidos que salen del propio
-  sitio (`src/middleware.ts`), además de exigir la sesión.
+  sitio, además de exigir la sesión (`denyAdminWrite`, en `src/lib/session.ts`). Ese
+  control va en cada ruta y no en el middleware: lo que pasa por el middleware de Next
+  lleva el cuerpo copiado, y las fotos de más de 2 o 3 MB llegaban rotas a la ruta.
+  `test/origin.test.ts` revisa que ninguna ruta se quede sin el control y que la API
+  no vuelva al middleware.
 - El login y el cambio de clave tienen tope de tamaño y de intentos (5 por IP y 30
   en total cada 15 minutos).
 - Cada página del panel verifica la sesión por su cuenta, no solo el middleware.

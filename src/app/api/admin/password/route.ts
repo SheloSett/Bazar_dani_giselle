@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin, setSessionCookie } from '@/lib/session';
+import { denyAdminWrite, setSessionCookie } from '@/lib/session';
 import { setPassword, verifyPassword } from '@/lib/credentials';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { bodyWithin, clientIp, passwordLimiter } from '@/lib/rate-limit';
@@ -8,8 +8,8 @@ import { bodyWithin, clientIp, passwordLimiter } from '@/lib/rate-limit';
 // lugar de ADMIN_PASSWORD del .env. Cierra las sesiones de los demás
 // dispositivos y renueva la de este navegador.
 export async function POST(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   if (!bodyWithin(req.headers, 2_000))
     return NextResponse.json({ error: 'Pedido inválido' }, { status: 413 });
 

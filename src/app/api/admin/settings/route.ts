@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite, isAdmin } from '@/lib/session';
 import { getSettings, updateSettings, SETTING_KEYS, type TextSettings } from '@/lib/data';
 import { parsePhone } from '@/lib/validate';
 
@@ -24,8 +24,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
 

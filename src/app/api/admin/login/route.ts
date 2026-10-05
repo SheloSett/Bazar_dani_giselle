@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authConfigError } from '@/lib/auth';
 import { checkPassword, getCredential } from '@/lib/credentials';
+import { isCrossOrigin } from '@/lib/origin';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import { bodyWithin, clientIp, loginLimiter } from '@/lib/rate-limit';
 import { setSessionCookie } from '@/lib/session';
@@ -9,6 +10,8 @@ import { setSessionCookie } from '@/lib/session';
 const MAX_BODY_BYTES = 2_000;
 
 export async function POST(req: NextRequest) {
+  if (isCrossOrigin(req.headers))
+    return NextResponse.json({ error: 'Pedido de otro origen' }, { status: 403 });
   if (!bodyWithin(req.headers, MAX_BODY_BYTES))
     return NextResponse.json({ error: 'Pedido inválido' }, { status: 413 });
 

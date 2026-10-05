@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite } from '@/lib/session';
 import {
   addPhoto,
   getAdminProduct,
@@ -12,8 +12,8 @@ import { parseId } from '@/lib/validate';
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const productId = parseId((await params).id);
 
   if (!productId || !(await getAdminProduct(productId)))
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 // Nuevo orden de las fotos: { order: [ids…] }, la primera es la portada
 export async function PATCH(req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const productId = parseId((await params).id);
   if (!productId) return NextResponse.json({ error: 'No existe' }, { status: 404 });
 

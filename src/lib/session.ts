@@ -1,13 +1,25 @@
 // Helpers de sesión para route handlers (Node)
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import type { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { SESSION_COOKIE, SESSION_MAX_AGE_S } from '@/lib/auth';
 import { newSessionToken, verifySession } from '@/lib/credentials';
+import { isCrossOrigin } from '@/lib/origin';
 
 export async function isAdmin(): Promise<boolean> {
   const store = await cookies();
   return verifySession(store.get(SESSION_COOKIE)?.value);
+}
+
+// Para las rutas del panel que cambian algo (POST, PATCH, DELETE): devuelve el
+// rechazo listo si el pedido viene de otro origen o no hay sesión, o null si puede
+// seguir. Va en cada ruta y no en el middleware (ver lib/origin.ts).
+export async function denyAdminWrite(req: NextRequest): Promise<NextResponse | null> {
+  if (isCrossOrigin(req.headers))
+    return NextResponse.json({ error: 'Pedido de otro origen' }, { status: 403 });
+  if (!(await isAdmin()))
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  return null;
 }
 
 // Para las páginas del panel: el middleware ya las protege, pero cada una verifica

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite } from '@/lib/session';
 import { setLogo } from '@/lib/data';
 import { logoNeedsName, photoSize, removePhotoFile, savePhoto } from '@/lib/uploads';
 
@@ -8,8 +8,8 @@ import { logoNeedsName, photoSize, removePhotoFile, savePhoto } from '@/lib/uplo
 // nombre; uno cuadrado o redondo va con el nombre al lado (a ese tamaño no se lee).
 
 export async function POST(req: NextRequest) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
 
   const form = await req.formData().catch(() => null);
   const file = form?.get('logo');
@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
 }
 
 // Quitar el logo: el catálogo vuelve a mostrar el nombre como texto
-export async function DELETE() {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+export async function DELETE(req: NextRequest) {
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const old = await setLogo(null);
   if (old) await removePhotoFile(old);
   return NextResponse.json({ logo: null });

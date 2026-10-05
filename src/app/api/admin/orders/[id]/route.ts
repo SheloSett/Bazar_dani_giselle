@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/lib/session';
+import { denyAdminWrite } from '@/lib/session';
 import { confirmOrder, deleteOrder, unconfirmOrder } from '@/lib/orders';
 import { parseId } from '@/lib/validate';
 
@@ -9,8 +9,8 @@ type Params = { params: Promise<{ id: string }> };
 // Confirmar descuenta el stock; si no alcanza responde 409 con los productos que
 // faltan, y con { force: true } confirma igual. Desmarcar devuelve lo descontado.
 export async function PATCH(req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ error: 'No existe' }, { status: 404 });
 
@@ -35,9 +35,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  if (!(await isAdmin()))
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const denied = await denyAdminWrite(req);
+  if (denied) return denied;
   const id = parseId((await params).id);
   if (!id || !(await deleteOrder(id)))
     return NextResponse.json({ error: 'No existe' }, { status: 404 });
