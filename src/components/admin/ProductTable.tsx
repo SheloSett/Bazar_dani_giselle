@@ -93,107 +93,109 @@ export function ProductTable({
           </Link>
         </div>
       )}
-      <table className="tbl">
-        <thead>
-          <tr>
-            <th></th>{/* flechas de orden */}
-            <th></th>{/* foto */}
-            <th>Nombre</th>
-            {!embedded && <th>Categoría</th>}
-            <th>Precio</th>
-            <th>Stock</th>
-            <th>Estado</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.length === 0 && (
+      <div className="tbl-wrap">
+        <table className="tbl">
+          <thead>
             <tr>
-              {/* colSpan era `embedded ? 6 : 7`: se le suma 1 por la columna nueva de flechas de orden */}
-              <td colSpan={embedded ? 7 : 8} className="empty">
-                Todavía no hay productos. Creá el primero con “Nuevo producto”.
-              </td>
+              <th></th>{/* flechas de orden */}
+              <th></th>{/* foto */}
+              <th>Nombre</th>
+              {!embedded && <th>Categoría</th>}
+              <th>Precio</th>
+              <th>Stock</th>
+              <th>Estado</th>
+              <th></th>
             </tr>
-          )}
-          {products.map((p) => {
-            // Primero y último de su rubro: las flechas hacia afuera se apagan
-            const siblings = products.filter((x) => x.category_id === p.category_id);
-            const first = siblings[0]?.id === p.id;
-            const last = siblings[siblings.length - 1]?.id === p.id;
-            return (
-            <tr key={p.id}>
-              <td className="mv-cell">
-                <span className="mv">
-                  <button
-                    type="button"
-                    onClick={() => move(p, -1)}
-                    disabled={busyId !== null || first}
-                    title="Subir en el orden del catálogo"
-                    aria-label={`Subir ${p.name}`}
-                  >
-                    <IconChevronUp />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => move(p, 1)}
-                    disabled={busyId !== null || last}
-                    title="Bajar en el orden del catálogo"
-                    aria-label={`Bajar ${p.name}`}
-                  >
-                    <IconChevronDown />
-                  </button>
-                </span>
-              </td>
-              <td>
-                {p.photos[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="thumb" src={thumbUrl(p.photos[0])} alt="" />
-                ) : (
-                  <span className="thumb-empty">
-                    <IconPhoto className="ic" />
+          </thead>
+          <tbody>
+            {products.length === 0 && (
+              <tr>
+                {/* colSpan era `embedded ? 6 : 7`: se le suma 1 por la columna nueva de flechas de orden */}
+                <td colSpan={embedded ? 7 : 8} className="empty">
+                  Todavía no hay productos. Creá el primero con “Nuevo producto”.
+                </td>
+              </tr>
+            )}
+            {products.map((p) => {
+              // Primero y último de su rubro: las flechas hacia afuera se apagan
+              const siblings = products.filter((x) => x.category_id === p.category_id);
+              const first = siblings[0]?.id === p.id;
+              const last = siblings[siblings.length - 1]?.id === p.id;
+              return (
+              <tr key={p.id}>
+                <td className="mv-cell">
+                  <span className="mv">
+                    <button
+                      type="button"
+                      onClick={() => move(p, -1)}
+                      disabled={busyId !== null || first}
+                      title="Subir en el orden del catálogo"
+                      aria-label={`Subir ${p.name}`}
+                    >
+                      <IconChevronUp />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => move(p, 1)}
+                      disabled={busyId !== null || last}
+                      title="Bajar en el orden del catálogo"
+                      aria-label={`Bajar ${p.name}`}
+                    >
+                      <IconChevronDown />
+                    </button>
                   </span>
-                )}
-              </td>
-              <td>{p.name}</td>
-              {!embedded && <td>{p.category ?? '—'}</td>}
-              <td className="price-cell">
-                {p.compare_price !== null && p.compare_price > p.price && (
-                  <>
-                    <s>{money(p.compare_price)}</s>{' '}
-                  </>
-                )}
-                {money(p.price)}
-              </td>
-              <td>
-                <StockCell stock={p.stock} />
-              </td>
-              <td>
-                <button
-                  className={p.visible ? 'pill on' : 'pill'}
-                  disabled={busyId === p.id}
-                  onClick={() => toggleVisible(p)}
-                  title="Cambiar visibilidad en el catálogo"
-                >
-                  {p.visible ? 'Visible' : 'Oculto'}
-                </button>
-              </td>
-              <td>
-                <div className="row-actions">
-                  <Link href={`/admin/products/${p.id}`}>Editar</Link>
+                </td>
+                <td>
+                  {p.photos[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="thumb" src={thumbUrl(p.photos[0])} alt="" />
+                  ) : (
+                    <span className="thumb-empty">
+                      <IconPhoto className="ic" />
+                    </span>
+                  )}
+                </td>
+                <td>{p.name}</td>
+                {!embedded && <td>{p.category ?? '—'}</td>}
+                <td className="price-cell">
+                  {p.compare_price !== null && p.compare_price > p.price && (
+                    <>
+                      <s>{money(p.compare_price)}</s>{' '}
+                    </>
+                  )}
+                  {money(p.price)}
+                </td>
+                <td>
+                  <StockCell stock={p.stock} />
+                </td>
+                <td>
                   <button
-                    className="btn-sm danger"
+                    className={p.visible ? 'pill on' : 'pill'}
                     disabled={busyId === p.id}
-                    onClick={() => remove(p)}
+                    onClick={() => toggleVisible(p)}
+                    title="Cambiar visibilidad en el catálogo"
                   >
-                    Eliminar
+                    {p.visible ? 'Visible' : 'Oculto'}
                   </button>
-                </div>
-              </td>
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                </td>
+                <td>
+                  <div className="row-actions">
+                    <Link href={`/admin/products/${p.id}`}>Editar</Link>
+                    <button
+                      className="btn-sm danger"
+                      disabled={busyId === p.id}
+                      onClick={() => remove(p)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
