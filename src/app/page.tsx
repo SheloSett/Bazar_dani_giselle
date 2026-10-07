@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { getSettings, listCategories, listPublicProducts } from '@/lib/data';
+import { listPublicPromos } from '@/lib/promos-data';
 import { ogImagePath } from '@/lib/catalog';
 import { siteBaseUrl } from '@/lib/site';
 import { Catalog } from '@/components/Catalog';
@@ -10,12 +11,13 @@ export const dynamic = 'force-dynamic';
 
 // Una sola lectura por pedido, compartida entre los metadatos y la página
 const loadCatalog = cache(async () => {
-  const [products, categories, settings] = await Promise.all([
+  const [products, categories, settings, promos] = await Promise.all([
     listPublicProducts(),
     listCategories(),
     getSettings(),
+    listPublicPromos(),
   ]);
-  return { products, categories, settings };
+  return { products, categories, settings, promos };
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,7 +50,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const { products, categories, settings } = await loadCatalog();
+  const { products, categories, settings, promos } = await loadCatalog();
 
   // Al navegador van solo los rubros que tienen algo para mostrar: los vacíos o con
   // todos sus productos ocultos no tienen por qué figurar en el código de la página
@@ -63,6 +65,7 @@ export default async function HomePage() {
         shown.flatMap((c) => (c.photo ? [[c.name, c.photo]] : []))
       )}
       settings={settings}
+      promos={promos}
     />
   );
 }

@@ -3,6 +3,8 @@
 
 import { isUniqueViolation, query, transaction } from '@/lib/db';
 import { planStock, type ShortItem, type StockLine } from '@/lib/order-rules';
+import { applyPromos, type DiscountLine } from '@/lib/promos';
+import { consumeCoupon, promosForOrder } from '@/lib/promos-data';
 import { sameOrderItems } from '@/lib/validate';
 
 // Máximo de una columna INTEGER de Postgres (el total del pedido)
@@ -20,7 +22,10 @@ export interface OrderItem {
 export interface Order {
   id: number;
   token: string;
+  // Lo que queda a pagar, ya con el descuento restado
   total: number;
+  discount: number;
+  discounts: DiscountLine[];
   created_at: Date;
   items: OrderItem[];
 }
@@ -75,7 +80,10 @@ export interface Customer {
   phone: string;
 }
 
-export type CreateOrderResult = 'created' | 'exists' | 'empty' | 'too-big';
+export type CreateOrderResult = 'created' | 'exists' | 'empty' | 'too-big' | 'coupon-invalid';
+
+// El cupón se agotó entre que se mostró y se guardó el pedido: no se guarda nada
+class CouponGone extends Error {}
 
 const dateFormat = new Intl.DateTimeFormat('es-AR', {
   dateStyle: 'long',
@@ -93,16 +101,24 @@ export const formatOrderDate = (d: Date) => dateFormat.format(d);
 export const formatOrderDateShort = (d: Date) => shortDateFormat.format(d);
 
 // Guarda el pedido con el nombre, el precio y la foto que cada producto tiene
-// AHORA en la base: del navegador solo se toman qué productos, cuántos y los
-// datos del cliente (ya validados). Los productos ocultos o que ya no existen
-// se dejan afuera.
+// AHORA en la base: del navegador solo se toman qué productos, cuántos, los datos
+// del cliente (ya validados) y el código de cupón, si escribió uno. Los productos
+// ocultos o que ya no existen se dejan afuera. El descuento se calcula acá con los
+// precios reales: lo que mostró el navegador no cuenta.
 export async function createOrder(
   token: string,
   wanted: { id: number; quantity: number }[],
-  customer: Customer
+  customer: Customer,
+  couponCode: string | null = null
 ): Promise<CreateOrderResult> {
-  const products = await query<{ id: number; name: string; price: number; photo: string | null }>(
-    `SELECT p.id, p.name, p.price,
+  const products = await query<{
+    id: number;
+    name: string;
+    price: number;
+    category_id: number | null;
+    photo: string | null;
+  }>(
+    `SELECT p.id, p.name, p.price, p.category_id,
             (SELECT ph.filename FROM product_photos ph
               WHERE ph.product_id = p.id ORDER BY ph.position, ph.id LIMIT 1) AS photo
      FROM products p
@@ -116,8 +132,24 @@ export async function createOrder(
   });
   if (!lines.length) return 'empty';
 
-  const total = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
-  if (total > PG_INT_MAX) return 'too-big';
+  const subtotal = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
+  if (subtotal > PG_INT_MAX) return 'too-big';
+
+  // Las promociones que pueden aplicar ahora y, si escribió un cupón, ese cupón. Un
+  // cupón que no existe, está pausado, vencido o agotado frena el pedido: el
+  // navegador avisa y la persona lo saca.
+  const promos = await promosForOrder(couponCode);
+  if (couponCode && !promos.some((p) => p.code === couponCode)) return 'coupon-invalid';
+  const pricing = applyPromos(
+    lines.map((l) => ({
+      product_id: l.id,
+      category_id: l.category_id,
+      price: l.price,
+      quantity: l.quantity,
+    })),
+    promos,
+    { code: couponCode, now: new Date() }
+  );
 
   // Pedido repetido: la misma persona (mismo teléfono) ya mandó exactamente los
   // mismos productos y cantidades en las últimas 24 horas (reenvíos del mismo
@@ -143,30 +175,38 @@ export async function createOrder(
   }
 
   try {
-    // Una sola sentencia: o se guarda el pedido entero o no se guarda nada
-    await query(
-      `WITH o AS (
-         INSERT INTO orders (token, total, customer_name, customer_phone)
-         VALUES ($1, $2, $9, $10) RETURNING id
-       )
-       INSERT INTO order_items (order_id, product_id, name, price, quantity, photo, position)
-       SELECT o.id, v.product_id, v.name, v.price, v.quantity, v.photo, v.position
-       FROM o, unnest($3::int[], $4::text[], $5::int[], $6::int[], $7::text[], $8::int[])
-            AS v(product_id, name, price, quantity, photo, position)`,
-      [
-        token,
-        total,
-        lines.map((l) => l.id),
-        lines.map((l) => l.name),
-        lines.map((l) => l.price),
-        lines.map((l) => l.quantity),
-        lines.map((l) => l.photo),
-        lines.map((_, i) => i + 1),
-        customer.name,
-        customer.phone,
-      ]
-    );
+    await transaction(async (q) => {
+      // Una sola sentencia: o se guarda el pedido entero o no se guarda nada
+      await q(
+        `WITH o AS (
+           INSERT INTO orders (token, total, customer_name, customer_phone, discount, discounts)
+           VALUES ($1, $2, $9, $10, $11, $12::jsonb) RETURNING id
+         )
+         INSERT INTO order_items (order_id, product_id, name, price, quantity, photo, position)
+         SELECT o.id, v.product_id, v.name, v.price, v.quantity, v.photo, v.position
+         FROM o, unnest($3::int[], $4::text[], $5::int[], $6::int[], $7::text[], $8::int[])
+              AS v(product_id, name, price, quantity, photo, position)`,
+        [
+          token,
+          pricing.total,
+          lines.map((l) => l.id),
+          lines.map((l) => l.name),
+          lines.map((l) => l.price),
+          lines.map((l) => l.quantity),
+          lines.map((l) => l.photo),
+          lines.map((_, i) => i + 1),
+          customer.name,
+          customer.phone,
+          pricing.discount,
+          JSON.stringify(pricing.lines),
+        ]
+      );
+      // El cupón usado suma un uso; si justo se agotó, no se guarda el pedido
+      const coupon = pricing.lines.find((l) => l.code !== null);
+      if (coupon && !(await consumeCoupon(coupon.promo_id, q))) throw new CouponGone();
+    });
   } catch (err) {
+    if (err instanceof CouponGone) return 'coupon-invalid';
     // El mismo pedido enviado dos veces (doble toque): ya está guardado
     if (isUniqueViolation(err)) return 'exists';
     throw err;
@@ -185,7 +225,7 @@ function orderItems(orderId: number): Promise<OrderItem[]> {
 // Para la página pública: a propósito no trae los datos del cliente
 export async function getOrder(token: string): Promise<Order | null> {
   const rows = await query<Omit<Order, 'items'>>(
-    'SELECT id, token, total, created_at FROM orders WHERE token = $1',
+    'SELECT id, token, total, discount, discounts, created_at FROM orders WHERE token = $1',
     [token]
   );
   const order = rows[0];
@@ -218,7 +258,8 @@ export async function pendingSummary(): Promise<PendingSummary> {
 
 export async function getAdminOrder(id: number): Promise<AdminOrder | null> {
   const rows = await query<Omit<AdminOrder, 'items'>>(
-    `SELECT id, token, total, created_at, customer_name, customer_phone, confirmed_at
+    `SELECT id, token, total, discount, discounts, created_at, customer_name, customer_phone,
+            confirmed_at
      FROM orders WHERE id = $1`,
     [id]
   );

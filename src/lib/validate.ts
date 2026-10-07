@@ -1,4 +1,5 @@
 // Validaciones compartidas por las rutas de la API
+import { normalizeCode, PROMO_CODE_RE, PROMO_NAME_MAX, type PromoInput } from '@/lib/promos';
 
 // Máximo de una columna INT/INTEGER de Postgres
 const PG_INT_MAX = 2_147_483_647;
@@ -181,4 +182,91 @@ export function sameIdSet(a: number[], b: number[]): boolean {
   const sa = [...a].sort((x, y) => x - y);
   const sb = [...b].sort((x, y) => x - y);
   return sa.every((id, i) => id === sb[i]);
+}
+
+// ---------- promociones y cupones ----------
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Fecha del formulario (AAAA-MM-DD) → instante en hora argentina. El día empieza
+// a las 0:00 y, si es la fecha de fin, termina a las 23:59:59. Vacío = sin fecha.
+export function parseArgDate(value: unknown, endOfDay: boolean): { value: Date | null } | null {
+  if (isBlank(value)) return { value: null };
+  if (typeof value !== 'string' || !DATE_RE.test(value.trim())) return null;
+  const d = new Date(`${value.trim()}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}-03:00`);
+  return Number.isNaN(d.getTime()) ? null : { value: d };
+}
+
+// Código de cupón escrito por una persona → normalizado, o null si no puede ser uno
+export function parseCouponCode(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 40) return null;
+  const code = normalizeCode(value);
+  return PROMO_CODE_RE.test(code) ? code : null;
+}
+
+// El formulario de una promoción o cupón del panel. Devuelve lo validado, o el
+// motivo (en castellano, para mostrarlo tal cual).
+export function parsePromoInput(body: unknown): { value: PromoInput } | { error: string } {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const fail = (error: string) => ({ error });
+
+  const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ') : '';
+  if (!name || name.length > PROMO_NAME_MAX)
+    return fail(`Falta el nombre de la promoción (hasta ${PROMO_NAME_MAX} caracteres).`);
+
+  let code: string | null = null;
+  if (!isBlank(b.code)) {
+    code = parseCouponCode(b.code);
+    if (!code) return fail('El código del cupón: solo letras, números o guiones, de 3 a 20.');
+  }
+
+  const kind = b.kind === 'amount' ? 'amount' : b.kind === 'percent' ? 'percent' : null;
+  if (!kind) return fail('Elegí si el descuento es en porcentaje o en pesos.');
+  const value = parsePrice(b.value);
+  if (value === null || value < 1 || (kind === 'percent' && value > 100))
+    return fail(
+      kind === 'percent'
+        ? 'El porcentaje tiene que ser de 1 a 100.'
+        : 'El descuento en pesos tiene que ser mayor a 0.'
+    );
+
+  const scope =
+    b.scope === 'all' || b.scope === 'category' || b.scope === 'product' ? b.scope : null;
+  if (!scope) return fail('Elegí a qué aplica la promoción.');
+  const category_id = scope === 'category' ? parseId(b.category_id) : null;
+  if (scope === 'category' && !category_id) return fail('Elegí el rubro.');
+  const product_id = scope === 'product' ? parseId(b.product_id) : null;
+  if (scope === 'product' && !product_id) return fail('Elegí el producto.');
+
+  const min_quantity = isBlank(b.min_quantity) ? 1 : parseId(b.min_quantity);
+  if (!min_quantity) return fail('El mínimo de unidades tiene que ser un número entero mayor a 0.');
+  const min_total = isBlank(b.min_total) ? 0 : parsePrice(b.min_total);
+  if (min_total === null) return fail('La compra mínima tiene que ser un importe en pesos.');
+
+  const starts = parseArgDate(b.starts_at, false);
+  const ends = parseArgDate(b.ends_at, true);
+  if (!starts || !ends) return fail('Las fechas tienen que ser válidas (AAAA-MM-DD).');
+  if (starts.value && ends.value && ends.value < starts.value)
+    return fail('La fecha de fin no puede ser anterior a la de inicio.');
+
+  let max_uses: number | null = null;
+  if (!isBlank(b.max_uses)) {
+    max_uses = parseId(b.max_uses);
+    if (!max_uses) return fail('El máximo de usos tiene que ser un número entero mayor a 0.');
+    if (!code) return fail('El máximo de usos es solo para cupones con código.');
+  }
+
+  const active =
+    b.active === undefined || b.active === null
+      ? true
+      : b.active === true || b.active === 'true' || b.active === 'on';
+
+  return {
+    value: {
+      name, code, kind, value, scope, category_id, product_id,
+      min_quantity, min_total,
+      starts_at: starts.value, ends_at: ends.value,
+      max_uses, active,
+    },
+  };
 }

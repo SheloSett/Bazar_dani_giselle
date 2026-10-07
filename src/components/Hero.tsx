@@ -1,8 +1,9 @@
 'use client';
 
-import type { Settings } from '@/lib/data';
+import type { PublicProduct, Settings } from '@/lib/data';
 import { thumbUrl } from '@/lib/catalog';
-import { IconStore, IconTruck, IconWhatsApp } from '@/components/icons';
+import { isPromoLive, promoSummary, type PublicPromo } from '@/lib/promos';
+import { IconStore, IconTag, IconTruck, IconWhatsApp } from '@/components/icons';
 import { FitPhoto } from '@/components/FitPhoto';
 
 // Portada: bloque de color con el logo en grande (pedido del cliente: el del
@@ -74,6 +75,40 @@ export function Perks({ settings }: { settings: Settings }) {
             <span>
               <strong>{p.title}</strong>
               <small>{p.text}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// Promociones automáticas vigentes, anunciadas debajo de los beneficios. Los nombres
+// del rubro o del producto alcanzado salen de los productos del catálogo.
+export function PromoStrip({
+  promos,
+  products,
+}: {
+  promos: PublicPromo[];
+  products: PublicProduct[];
+}) {
+  const now = new Date();
+  const live = promos.filter((p) => isPromoLive(p, now));
+  if (!live.length) return null;
+
+  const names = (p: PublicPromo) => ({
+    product: p.product_id ? products.find((x) => x.id === p.product_id)?.name : null,
+    category: p.category_id ? products.find((x) => x.category_id === p.category_id)?.category : null,
+  });
+
+  return (
+    <section className="promo-strip" aria-label="Promociones">
+      <ul>
+        {live.map((p) => (
+          <li key={p.id}>
+            <IconTag />
+            <span>
+              <strong>{p.name}:</strong> {promoSummary(p, names(p))}
             </span>
           </li>
         ))}

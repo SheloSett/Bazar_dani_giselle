@@ -144,6 +144,31 @@ cliente por WhatsApp, imprimir o eliminar.
 - Límites de la ruta pública: cuerpo de 20 KB, 100 productos, 12 pedidos por IP y 240
   en total cada 10 minutos.
 
+## Promociones y cupones
+
+En **Promociones** (panel) se crean descuentos de dos tipos: **promociones
+automáticas**, que aplican solas cuando el pedido cumple sus condiciones, y
+**cupones**, que aplican solo si la persona escribe el código al armar el pedido
+(y se suman a la promoción automática). Cada una descuenta un porcentaje o un
+importe fijo sobre los productos alcanzados (todo el pedido, un rubro o un
+producto), con condiciones opcionales: mínimo de unidades de esos productos,
+compra mínima del pedido, vigencia (fechas en hora argentina, el día de fin
+completo) y, para cupones, un máximo de usos. Se pausan y reactivan desde la lista.
+
+- Si hay varias promociones automáticas que aplican, se usa la que más descuenta;
+  no se suman entre sí. El descuento nunca supera el subtotal de los productos
+  alcanzados.
+- Las promociones vigentes se anuncian en el catálogo debajo de los beneficios; los
+  códigos de cupón nunca viajan al navegador. El catálogo verifica un cupón con
+  `POST /api/promos/coupon` (con límite de intentos) y recalcula el descuento
+  mientras el pedido cambia.
+- El descuento real lo calcula el servidor al guardar el pedido, con los precios de
+  la base; queda en `orders.discount` y `orders.discounts` (detalle), y
+  `orders.total` ya lo tiene restado. Cada pedido guardado con un cupón suma un
+  uso (`promos.uses`); borrar el pedido no lo devuelve.
+- Reglas en `src/lib/promos.ts` (puras, con tests), acceso a la base en
+  `src/lib/promos-data.ts`, formulario validado en `parsePromoInput`.
+
 ## Desarrollo local
 
 ```bash

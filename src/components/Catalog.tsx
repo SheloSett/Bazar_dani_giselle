@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { PublicProduct, Settings } from '@/lib/data';
 import { CUSTOMER_NAME_MAX, checkCustomerPhone, parseCustomerName } from '@/lib/validate';
+import { applyPromos, type PublicPromo } from '@/lib/promos';
 import {
   discountPercent,
   isOutOfStock,
@@ -18,7 +19,7 @@ import {
 import { Brand } from '@/components/Brand';
 import { ProductCard } from '@/components/ProductCard';
 import { Gallery } from '@/components/Gallery';
-import { Hero, Perks } from '@/components/Hero';
+import { Hero, Perks, PromoStrip } from '@/components/Hero';
 import { CategoryTiles } from '@/components/CategoryTiles';
 import { SiteFooter, WhatsAppFab } from '@/components/SiteFooter';
 import {
@@ -48,6 +49,8 @@ const pushSheets = (sheets: SheetState) =>
 // Último código de pedido con la firma de su contenido: el mismo carrito con los
 // mismos datos reusa el mismo código, incluso después de recargar la página
 const ORDER_TOKEN_KEY = 'catalogo-pedido-token';
+// Código del cupón aplicado, para no tener que escribirlo de nuevo
+const COUPON_KEY = 'catalogo-cupon';
 
 type Cart = Record<number, number>; // product id -> cantidad
 type CartNames = Record<number, string>; // product id -> nombre
@@ -88,11 +91,14 @@ export function Catalog({
   categories,
   categoryPhotos = {},
   settings,
+  promos = [],
 }: {
   products: PublicProduct[];
   categories: string[];
   categoryPhotos?: Record<string, string>; // nombre de categoría -> foto propia del rubro
   settings: Settings;
+  // Promociones automáticas vigentes (los cupones no viajan: se verifican al escribirlos)
+  promos?: PublicPromo[];
 }) {
   const [cart, setCart] = useState<Cart>({});
   const [category, setCategory] = useState('Todo');
@@ -106,6 +112,11 @@ export function Catalog({
   // Quién pide: nombre y teléfono, obligatorios para enviar
   const [customer, setCustomer] = useState({ name: '', phone: '' });
   const [customerErrors, setCustomerErrors] = useState(false);
+  // Cupón: lo que escribe la persona y, si el servidor lo reconoció, la promoción
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<{ code: string; promo: PublicPromo } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [couponBusy, setCouponBusy] = useState(false);
   const customerName = parseCustomerName(customer.name);
   const phoneCheck = checkCustomerPhone(customer.phone);
   const customerPhone = phoneCheck.ok ? phoneCheck.phone : null;
@@ -233,6 +244,28 @@ export function Catalog({
     setCart(saved);
   }, [products, showToast]);
 
+  // El cupón que quedó aplicado la vez anterior se vuelve a verificar (puede haber vencido)
+  useEffect(() => {
+    const saved = readStore<{ code?: unknown }>(COUPON_KEY);
+    if (typeof saved.code !== 'string' || !saved.code) return;
+    let cancelled = false;
+    fetch('/api/promos/coupon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: saved.code }),
+    })
+      .then(async (res) => ({ ok: res.ok, data: (await res.json()) as { promo?: PublicPromo } }))
+      .then(({ ok, data }) => {
+        if (cancelled) return;
+        if (ok && data.promo?.code) setCoupon({ code: data.promo.code, promo: data.promo });
+        else writeStore(COUPON_KEY, {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const updateCart = (next: Cart) => {
     setCart(next);
     persistCart(next);
@@ -292,7 +325,56 @@ export function Catalog({
     [cart, products]
   );
   const count = items.reduce((s, x) => s + x.n, 0);
-  const total = items.reduce((s, x) => s + x.n * x.p.price, 0);
+  const subtotal = items.reduce((s, x) => s + x.n * x.p.price, 0);
+  // Promociones automáticas y el cupón aplicado: el total es lo que queda a pagar
+  const pricing = useMemo(
+    () =>
+      applyPromos(
+        items.map((x) => ({
+          product_id: x.p.id,
+          category_id: x.p.category_id,
+          price: x.p.price,
+          quantity: x.n,
+        })),
+        coupon ? [...promos, coupon.promo] : promos,
+        { code: coupon?.code ?? null, now: new Date() }
+      ),
+    [items, promos, coupon]
+  );
+  const total = pricing.total;
+
+  // Cupón: lo verifica el servidor (los códigos no viajan al navegador) y devuelve
+  // la promoción, así el descuento se recalcula acá si el pedido cambia
+  const verifyCoupon = async (code: string) => {
+    setCouponBusy(true);
+    setCouponError('');
+    try {
+      const res = await fetch('/api/promos/coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        promo?: PublicPromo;
+        error?: string;
+      } | null;
+      if (res.ok && data?.promo?.code) {
+        setCoupon({ code: data.promo.code, promo: data.promo });
+        setCouponInput('');
+        writeStore(COUPON_KEY, { code: data.promo.code });
+      } else {
+        setCouponError(data?.error || 'No pudimos verificar el cupón. Probá de nuevo.');
+      }
+    } catch {
+      setCouponError('No pudimos verificar el cupón. Probá de nuevo.');
+    }
+    setCouponBusy(false);
+  };
+  const removeCoupon = () => {
+    setCoupon(null);
+    setCouponError('');
+    writeStore(COUPON_KEY, {});
+  };
 
   const orderMessage = () => {
     const lines = items
@@ -305,7 +387,13 @@ export function Catalog({
     const hello = customerName ? `Hola, soy ${customerName}.` : 'Hola.';
     const phone = customer.phone.trim() ? `\nMi teléfono: ${customer.phone.trim()}` : '';
     const link = orderLink ? `\nVer pedido con fotos: ${orderLink.url}` : '';
-    return `${hello} Les paso mi pedido desde el catálogo:\n${lines}\nTotal estimado: ${money(total)}${phone}${link}\n¿Me confirman cotización y entrega?`;
+    const discounts = pricing.lines
+      .map((l) => `- ${l.code ? `Cupón ${l.code}` : l.name}: -${money(l.amount)}`)
+      .join('\n');
+    const totals = discounts
+      ? `Subtotal: ${money(subtotal)}\n${discounts}\nTotal estimado: ${money(total)}`
+      : `Total estimado: ${money(total)}`;
+    return `${hello} Les paso mi pedido desde el catálogo:\n${lines}\n${totals}${phone}${link}\n¿Me confirman cotización y entrega?`;
   };
 
   // Guarda el pedido: así queda en el panel y el link del mensaje funciona. Sale al
@@ -323,10 +411,17 @@ export function Catalog({
         token: orderLink.token,
         items: items.map((x) => ({ id: x.p.id, quantity: x.n })),
         customer: { name: customer.name, phone: customer.phone },
+        coupon: coupon?.code ?? null,
       }),
     })
-      .then((res) => {
-        if (!res.ok) failed();
+      .then(async (res) => {
+        if (res.ok) return;
+        const data = (await res.json().catch(() => null)) as { coupon?: string } | null;
+        if (data?.coupon === 'invalid') {
+          // El cupón dejó de valer entre que se aplicó y se envió: se saca y se avisa
+          removeCoupon();
+          showToast('El cupón ya no es válido. Lo sacamos del pedido: volvé a tocar Enviar.', 7000);
+        } else failed();
       })
       .catch(failed);
   };
@@ -427,6 +522,7 @@ export function Catalog({
         onBrowse={browse}
       />
       <Perks settings={settings} />
+      <PromoStrip promos={promos} products={products} />
       <CategoryTiles tiles={tiles} active={category} onPick={pickCategory} />
 
       <section className="tools">
@@ -609,9 +705,70 @@ export function Catalog({
             </div>
             {items.length > 0 && (
               <>
+                {pricing.lines.length > 0 && (
+                  <div className="disc">
+                    <div className="disc-row">
+                      <span>Subtotal</span>
+                      <span>{money(subtotal)}</span>
+                    </div>
+                    {pricing.lines.map((l) => (
+                      <div className="disc-row off" key={l.promo_id}>
+                        <span>{l.code ? `Cupón ${l.code}` : l.name}</span>
+                        <span>{`−${money(l.amount)}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="total">
                   <span>Total estimado</span>
                   <span className="v">{money(total)}</span>
+                </div>
+                <div className="coupon">
+                  {coupon ? (
+                    <p className="coupon-on">
+                      <span>
+                        Cupón <strong>{coupon.code}</strong> aplicado
+                        {pricing.couponNote && (
+                          <span className="warn">{` · ${pricing.couponNote}`}</span>
+                        )}
+                      </span>
+                      <button type="button" className="btn-ghost" onClick={removeCoupon}>
+                        Quitar
+                      </button>
+                    </p>
+                  ) : (
+                    <form
+                      className="coupon-row"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (couponInput.trim() && !couponBusy) verifyCoupon(couponInput);
+                      }}
+                    >
+                      <input
+                        id="cupon"
+                        aria-label="Cupón de descuento"
+                        placeholder="¿Tenés un cupón?"
+                        value={couponInput}
+                        onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                        maxLength={20}
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="submit"
+                        className="btn-sm"
+                        disabled={couponBusy || !couponInput.trim()}
+                      >
+                        {couponBusy ? 'Verificando…' : 'Aplicar'}
+                      </button>
+                    </form>
+                  )}
+                  {couponError && (
+                    <p className="who-err" role="alert">
+                      {couponError}
+                    </p>
+                  )}
                 </div>
                 <div className="who">
                   <p className="pv-label">Tus datos, para coordinar el pedido:</p>

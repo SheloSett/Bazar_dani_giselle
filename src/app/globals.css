@@ -235,6 +235,17 @@ img { max-width: 100%; }
   .rubro-txt small { font-size: 0.76rem; }
 }
 
+/* ---------- promociones vigentes (debajo de los beneficios) ---------- */
+.promo-strip { max-width: var(--wrap); margin: 0 auto; padding: 14px 20px 0; }
+.promo-strip ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.promo-strip li {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+  border-radius: 12px; background: #fff6dd; border: 1px solid #f0d58a; color: #5c4300;
+  font-size: 0.92rem; line-height: 1.4;
+}
+.promo-strip .ic { width: 1.15em; height: 1.15em; flex: 0 0 auto; }
+.promo-strip strong { font-weight: 800; }
+
 /* ---------- herramientas ---------- */
 .tools {
   max-width: var(--wrap); margin: 0 auto; padding: 46px 20px 6px;
@@ -554,6 +565,23 @@ img { max-width: 100%; }
 .line .nm .warn { color: #a3271f; }
 .total { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 0 8px; font-weight: 700; }
 .total .v { font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+/* descuentos del pedido y cupón */
+.disc { display: grid; gap: 4px; padding-top: 12px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.disc-row { display: flex; justify-content: space-between; gap: 12px; color: var(--soft); }
+.disc-row.off { color: var(--accent); font-weight: 700; }
+.coupon { margin: 0 0 14px; }
+.coupon-row { display: flex; gap: 8px; }
+.coupon-row input {
+  flex: 1; min-width: 0; border: 1px solid #dfe1e3; border-radius: 12px; padding: 10px 13px;
+  font: inherit; color: var(--ink); background: #fff; text-transform: uppercase;
+}
+.coupon-row input::placeholder { text-transform: none; }
+.coupon-row .btn-sm { padding: 10px 16px; flex: 0 0 auto; }
+.coupon-on {
+  margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex-wrap: wrap; font-size: 0.9rem; color: var(--accent); font-weight: 600;
+}
+.coupon-on .warn { color: #a3271f; font-weight: 600; }
 .pv-label { font-size: 0.78rem; font-weight: 700; color: var(--soft); margin: 6px 0 6px; }
 /* nombre y teléfono de quien pide (obligatorios para enviar) */
 .who { margin: 0 0 12px; }
@@ -608,6 +636,9 @@ img { max-width: 100%; }
   padding: 18px 0 6px; font-weight: 700;
 }
 .ord-total strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.ord-disc { display: grid; gap: 4px; padding-top: 14px; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.ord-disc div { display: flex; justify-content: space-between; gap: 12px; color: var(--soft); }
+.ord-disc .off { color: var(--accent); font-weight: 700; }
 .ord-note { color: var(--soft); font-size: 0.86rem; margin: 6px 0 22px; }
 .ord-back { color: var(--accent); font-weight: 600; text-decoration: none; }
 /* ---------- términos y condiciones, política de privacidad ---------- */
@@ -845,6 +876,14 @@ img { max-width: 100%; }
 .pill.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 .pill.out { background: #fbeaea; border-color: #f3c9c6; color: #a3271f; }
 .pill.low { color: #a3271f; }
+/* promoción programada (todavía no empezó) */
+.pill.soon { background: #eef3ff; border-color: #c9d6f5; color: #2b4ea3; }
+.code-pill {
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.8rem;
+  background: var(--tile); border-radius: 6px; padding: 2px 6px; white-space: nowrap;
+}
+.tbl .row-sub { display: block; color: var(--soft); font-size: 0.8rem; }
+.promo-form .check { margin-bottom: 0; }
 /* pedido pendiente: llama la atención hasta que se confirma */
 .pill.wait { background: #fff6dd; border-color: #f0d58a; color: #7a5900; }
 /* estado de un pedido: la pastilla y, si está pendiente, el botón para confirmarlo */

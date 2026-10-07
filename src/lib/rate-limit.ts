@@ -57,6 +57,7 @@ const globalForLimiter = globalThis as unknown as {
   loginLimiter?: ReturnType<typeof createLoginLimiter>;
   passwordLimiter?: ReturnType<typeof createLoginLimiter>;
   orderLimiter?: ReturnType<typeof createLoginLimiter>;
+  couponLimiter?: ReturnType<typeof createLoginLimiter>;
 };
 
 // "Cambiar clave" pide la clave actual: con una sesión robada no tiene que servir
@@ -81,6 +82,14 @@ export const orderLimiter = (globalForLimiter.orderLimiter ??= createLoginLimite
   windowMs: 10 * 60 * 1000,
   maxPerIp: 12,
   maxGlobal: 240,
+}));
+
+// Cupones que no existen (ruta pública): los códigos no se adivinan probando.
+// 20 fallos por IP y 300 en total cada 10 minutos.
+export const couponLimiter = (globalForLimiter.couponLimiter ??= createLoginLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxPerIp: 20,
+  maxGlobal: 300,
 }));
 
 // El cuerpo declara su tamaño y entra en el tope. Se mira antes de leerlo: sin esto,

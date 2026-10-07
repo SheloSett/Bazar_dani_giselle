@@ -7,6 +7,7 @@ import {
   IconBox,
   IconExternal,
   IconLogout,
+  IconPercent,
   IconPrint,
   IconSliders,
   IconTag,
@@ -23,7 +24,9 @@ export function AdminNav({ pendingOrders = 0 }: { pendingOrders?: number }) {
       ? 'categories'
       : path.startsWith('/admin/orders')
         ? 'orders'
-        : 'products';
+        : path.startsWith('/admin/promos')
+          ? 'promos'
+          : 'products';
   const current = (s: typeof section) => (s === section ? 'page' : undefined);
 
   return (
@@ -54,6 +57,9 @@ export function AdminNav({ pendingOrders = 0 }: { pendingOrders?: number }) {
               {pendingOrders}
             </span>
           )}
+        </Link>
+        <Link href="/admin/promos" aria-current={current('promos')}>
+          <IconPercent /> Promociones
         </Link>
         <Link href="/admin/settings" aria-current={current('settings')}>
           <IconSliders /> Ajustes

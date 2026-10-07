@@ -22,11 +22,11 @@ export interface PublicProduct {
   // Unidades disponibles; null = no se controla el stock
   stock: number | null;
   category: string | null;
+  category_id: number | null;
   photos: string[];
 }
 
 export interface AdminProduct extends PublicProduct {
-  category_id: number | null;
   visible: boolean;
   position: number;
 }
@@ -230,7 +230,7 @@ export async function listPublicProducts(): Promise<PublicProduct[]> {
   // Los productos sin stock van al final de su categoría.
   // El stock sale acotado (PUBLIC_STOCK_CAP): el número real solo lo ve el panel.
   return query<PublicProduct>(
-    `SELECT p.id, p.name, p.description, p.price, p.compare_price,
+    `SELECT p.id, p.name, p.description, p.price, p.compare_price, p.category_id,
             CASE WHEN p.stock IS NULL THEN NULL ELSE LEAST(p.stock, $1::int) END AS stock,
             c.name AS category, ${PHOTO_AGG}
      FROM products p
