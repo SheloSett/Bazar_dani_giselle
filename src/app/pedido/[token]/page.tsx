@@ -90,20 +90,6 @@ export default async function OrderPage({ params }: Props) {
         ))}
       </ul>
 
-      {order.discount > 0 && (
-        <div className="ord-disc">
-          <div>
-            <span>Subtotal</span>
-            <span>{money(order.total + order.discount)}</span>
-          </div>
-          {order.discounts.map((d) => (
-            <div className="off" key={d.promo_id}>
-              <span>{d.code ? `Cupón ${d.code}` : d.name}</span>
-              <span>{`−${money(d.amount)}`}</span>
-            </div>
-          ))}
-        </div>
-      )}
       <div className="ord-total">
         <span>Total estimado</span>
         <strong>{money(order.total)}</strong>

@@ -3,7 +3,6 @@ import { createOrder } from '@/lib/orders';
 import { clientIp, orderLimiter } from '@/lib/rate-limit';
 import {
   ORDER_TOKEN_RE,
-  parseCouponCode,
   parseCustomerName,
   parseCustomerPhone,
   parseOrderItems,
@@ -47,25 +46,8 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
 
-  // Cupón: opcional. Si viene algo que no puede ser un código, el pedido no se guarda
-  const rawCoupon = body?.coupon;
-  const coupon =
-    rawCoupon === undefined || rawCoupon === null || rawCoupon === ''
-      ? null
-      : parseCouponCode(rawCoupon);
-  if (rawCoupon && !coupon)
-    return NextResponse.json(
-      { error: 'El cupón no es válido', coupon: 'invalid' },
-      { status: 400 }
-    );
-
   orderLimiter.fail(ip);
-  const result = await createOrder(token, items, { name, phone }, coupon);
-  if (result === 'coupon-invalid')
-    return NextResponse.json(
-      { error: 'El cupón ya no es válido', coupon: 'invalid' },
-      { status: 400 }
-    );
+  const result = await createOrder(token, items, { name, phone });
   if (result === 'empty')
     return NextResponse.json(
       { error: 'Ninguno de esos productos está disponible' },
