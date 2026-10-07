@@ -55,12 +55,18 @@ img { max-width: 100%; }
 
 /* Foto que llena su recuadro (FitPhoto). Con .whole se ve entera (sin recortar) sobre
    la misma foto desenfocada: para fotos con otra forma que el recuadro */
-.fit { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; }
-.fit > img { position: relative; display: block; width: 100%; height: 100%; object-fit: cover; }
+.fit { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; isolation: isolate; }
+/* z-index y capa propia: en Safari (iPhone), al deslizar, el fondo desenfocado (una
+   capa compuesta por el filtro) se pintaba por encima de la foto y el rubro "se rompía" */
+.fit > img {
+  position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: cover;
+  transform: translateZ(0);
+}
 .fit.whole::before {
-  content: ''; position: absolute; inset: -30px;
+  content: ''; position: absolute; inset: -30px; z-index: 0;
   background: var(--src) center / cover no-repeat;
   filter: blur(22px); /* sin oscurecer: en fotos de fondo blanco el relleno queda blanco */
+  transform: translateZ(0); will-change: transform;
 }
 .fit.whole > img { object-fit: contain; }
 
@@ -191,6 +197,8 @@ img { max-width: 100%; }
 .rubros-grid::-webkit-scrollbar { display: none; }
 .rubro {
   position: relative; display: block; overflow: hidden; text-align: left;
+  /* Safari: que el borde redondeado recorte también las capas compuestas de adentro */
+  transform: translateZ(0);
   flex: 1 0 calc((100% - (var(--per) - 1) * var(--gap)) / var(--per));
   scroll-snap-align: start;
   border-radius: var(--tile-r); aspect-ratio: 16 / 10; background: var(--tile);
