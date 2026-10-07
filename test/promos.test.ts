@@ -2,11 +2,18 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyPromos,
+  conditionText,
+  countdownParts,
   formatPromoDate,
+  hasManualOffer,
   isPromoLive,
   normalizeCode,
+  productPromo,
+  productPromoText,
+  promoBadge,
   promoDiscount,
   promoInputDate,
+  promoOffer,
   promoStatus,
   promoSummary,
   type PromoItem,
@@ -216,5 +223,62 @@ describe('formulario de promoción (parsePromoInput)', () => {
     assert.equal(parseArgDate('2026-10-07', false)?.value?.toISOString(), '2026-10-07T03:00:00.000Z');
     assert.equal(parseArgDate('2026-10-07', true)?.value?.toISOString(), '2026-10-08T02:59:59.999Z');
     assert.equal(parseArgDate('ayer', false), null);
+  });
+});
+
+describe('ofertas propias y campañas en cada producto', () => {
+
+  test('un producto con precio anterior queda afuera de promociones y cupones', () => {
+    const withSale: PromoItem[] = [
+      { product_id: 10, category_id: 1, price: 1000, quantity: 2, on_sale: true },
+      { product_id: 11, category_id: 1, price: 500, quantity: 1 },
+    ];
+    assert.equal(promoDiscount(promo({ value: 10 }), withSale).amount, 50);
+    assert.deepEqual(promoDiscount(promo({ value: 10, scope: 'product', product_id: 10 }), withSale), { amount: 0, why: 'no se suma a productos que ya están en oferta' });
+    assert.equal(hasManualOffer({ price: 800, compare_price: 1000 }), true);
+    assert.equal(hasManualOffer({ price: 1000, compare_price: 1000 }), false);
+    assert.equal(hasManualOffer({ price: 1000, compare_price: null }), false);
+  });
+
+  test('la campaña del producto: la que más descuenta, con precio nuevo si aplica tal cual', () => {
+    const p = { id: 10, category_id: 1, price: 10000, compare_price: null };
+    const promos = [promo({ id: 1, value: 10 }), promo({ id: 2, value: 20, scope: 'category', category_id: 1 }), promo({ id: 3, value: 50, code: 'X' })];
+    const pp = productPromo(p, promos, NOW);
+    assert.equal(pp?.promo.id, 2);
+    assert.equal(pp?.price, 8000);
+    assert.equal(pp?.percent, 20);
+    assert.equal(pp?.condition, null);
+    assert.equal(productPromoText(pp!), 'Semana del hogar: 20% de descuento');
+  });
+
+  test('con mínimos, la línea dice el precio por unidad y la condición', () => {
+    const p = { id: 10, category_id: 1, price: 10000, compare_price: null };
+    const pp = productPromo(p, [promo({ id: 2, name: 'Éxitos', value: 20, min_quantity: 2 })], NOW);
+    assert.equal(pp?.condition, 'llevando 2 o más');
+    assert.equal(productPromoText(pp!), 'Éxitos: $ 8.000 c/u llevando 2 o más');
+    const amount = productPromo(p, [promo({ id: 3, name: 'Fijo', kind: 'amount', value: 1500, min_total: 20000 })], NOW);
+    assert.equal(amount?.price, null);
+    assert.equal(productPromoText(amount!), 'Fijo: $ 1.500 de descuento con compras desde $ 20.000');
+  });
+
+  test('sin campaña, con oferta propia o con cupón solamente, no hay precio nuevo', () => {
+    assert.equal(productPromo({ id: 10, category_id: 1, price: 10000, compare_price: null }, [], NOW), null);
+    assert.equal(productPromo({ id: 10, category_id: 1, price: 8000, compare_price: 10000 }, [promo()], NOW), null);
+    assert.equal(productPromo({ id: 10, category_id: 1, price: 10000, compare_price: null }, [promo({ code: 'X' })], NOW), null);
+    assert.equal(productPromo({ id: 10, category_id: 2, price: 10000, compare_price: null }, [promo({ scope: 'category', category_id: 1 })], NOW), null);
+  });
+
+  test('textos de la tarjeta de campaña', () => {
+    assert.deepEqual(promoBadge(promo({ value: 20 })), { amount: '20%', suffix: 'OFF' });
+    assert.deepEqual(promoBadge(promo({ kind: 'amount', value: 1500 })), { amount: '$ 1.500', suffix: 'OFF' });
+    assert.equal(promoOffer(promo({ value: 15, scope: 'category', category_id: 2, min_quantity: 3, ends_at: '2026-10-20' }), { category: 'Cocina' }), '15% de descuento en Cocina llevando 3 o más');
+    assert.equal(conditionText(promo({ min_quantity: 2, min_total: 5000 })), 'llevando 2 o más y con compras desde $ 5.000');
+  });
+
+  test('cuenta regresiva', () => {
+    assert.deepEqual(countdownParts('2026-10-10T15:00:30-03:00', NOW), { days: 3, hours: 0, minutes: 0, seconds: 30, urgent: false });
+    assert.deepEqual(countdownParts('2026-10-08T16:01:05-03:00', NOW), { days: 1, hours: 1, minutes: 1, seconds: 5, urgent: true });
+    assert.equal(countdownParts('2026-10-07T14:59:59-03:00', NOW), null);
+    assert.equal(countdownParts(null, NOW), null);
   });
 });

@@ -203,11 +203,12 @@ export function PromoManager({
         )}
       </div>
       <p className="section-note">
-        Una <strong>promoción</strong> aplica sola cuando el pedido cumple sus condiciones
-        (si hay varias, la que más descuenta). Un <strong>cupón</strong> es igual, pero solo
-        aplica si la persona escribe su código al armar el pedido, y se suma a la
-        promoción. El descuento sale de los productos alcanzados y se ve en el pedido, en
-        el mensaje de WhatsApp y en el panel.
+        Una <strong>campaña</strong> aplica sola cuando el pedido cumple sus condiciones (si
+        hay varias, la que más descuenta) y se anuncia en la portada del catálogo, con el
+        precio rebajado en cada producto alcanzado. Un <strong>cupón</strong> es igual, pero
+        solo aplica si la persona escribe su código al armar el pedido, y se suma a la
+        campaña. Los productos con <strong>precio anterior</strong> cargado (oferta propia)
+        quedan afuera: nunca se suman dos descuentos sobre lo mismo.
       </p>
 
       {ok && <div className="msg-ok">{ok}</div>}
@@ -236,7 +237,7 @@ export function PromoManager({
                   checked={!form.isCoupon}
                   onChange={() => set({ isCoupon: false })}
                 />
-                Promoción automática
+                Campaña (aplica sola)
               </label>
               <label className="check">
                 <input
@@ -478,7 +479,7 @@ export function PromoManager({
                         <span className="code-pill">{p.code}</span>
                       </>
                     )}
-                    <small className="row-sub">{p.code ? 'Cupón' : 'Promoción automática'}</small>
+                    <small className="row-sub">{p.code ? 'Cupón' : 'Campaña'}</small>
                   </td>
                   <td>{promoSummary(p, { category: p.category_name, product: p.product_name })}</td>
                   <td>{p.code ? `${p.uses}${p.max_uses ? ` / ${p.max_uses}` : ''}` : '—'}</td>

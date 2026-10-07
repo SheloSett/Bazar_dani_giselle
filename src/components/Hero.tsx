@@ -1,9 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { PublicProduct, Settings } from '@/lib/data';
 import { thumbUrl } from '@/lib/catalog';
-import { isPromoLive, promoSummary, type PublicPromo } from '@/lib/promos';
-import { IconStore, IconTag, IconTruck, IconWhatsApp } from '@/components/icons';
+import {
+  countdownParts,
+  formatPromoDate,
+  isPromoLive,
+  promoBadge,
+  promoOffer,
+  type PublicPromo,
+} from '@/lib/promos';
+import { IconChevronRight, IconStore, IconTag, IconTruck, IconWhatsApp } from '@/components/icons';
 import { FitPhoto } from '@/components/FitPhoto';
 
 // Portada: bloque de color con el logo en grande (pedido del cliente: el del
@@ -83,36 +91,108 @@ export function Perks({ settings }: { settings: Settings }) {
   );
 }
 
-// Promociones automáticas vigentes, anunciadas debajo de los beneficios. Los nombres
-// del rubro o del producto alcanzado salen de los productos del catálogo.
-export function PromoStrip({
+// Hora actual que avanza cada segundo mientras haga falta (cuenta regresiva)
+function useNow(enabled: boolean): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!enabled) return;
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, [enabled]);
+  return now;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+// Campañas vigentes: una tarjeta grande por cada una, debajo de los beneficios, con
+// el descuento en grande, la cuenta regresiva si tiene fecha de fin y un botón que
+// lleva a los productos alcanzados (el rubro, el producto o toda la grilla).
+export function Campaigns({
   promos,
   products,
+  onPick,
+  onBrowse,
+  onProduct,
 }: {
   promos: PublicPromo[];
   products: PublicProduct[];
+  onPick: (category: string) => void;
+  onBrowse: () => void;
+  onProduct: (p: PublicProduct) => void;
 }) {
-  const now = new Date();
-  const live = promos.filter((p) => isPromoLive(p, now));
+  const now = useNow(promos.some((p) => !!p.ends_at));
+  const live = promos.filter((p) => p.code === null && isPromoLive(p, now));
   if (!live.length) return null;
 
   const names = (p: PublicPromo) => ({
     product: p.product_id ? products.find((x) => x.id === p.product_id)?.name : null,
     category: p.category_id ? products.find((x) => x.category_id === p.category_id)?.category : null,
   });
+  const go = (p: PublicPromo) => {
+    if (p.scope === 'product') {
+      const prod = products.find((x) => x.id === p.product_id);
+      if (prod) return onProduct(prod);
+    }
+    if (p.scope === 'category') {
+      const cat = names(p).category;
+      if (cat) return onPick(cat);
+    }
+    onBrowse();
+  };
 
   return (
-    <section className="promo-strip" aria-label="Promociones">
-      <ul>
-        {live.map((p) => (
-          <li key={p.id}>
-            <IconTag />
-            <span>
-              <strong>{p.name}:</strong> {promoSummary(p, names(p))}
-            </span>
-          </li>
-        ))}
-      </ul>
+    <section className="campaigns" aria-label="Promociones vigentes">
+      {live.map((p) => {
+        const badge = promoBadge(p);
+        const cd = countdownParts(p.ends_at, now);
+        const ends = formatPromoDate(p.ends_at);
+        const units = cd
+          ? [
+              ...(cd.days > 0 ? [[String(cd.days), cd.days === 1 ? 'día' : 'días']] : []),
+              [pad(cd.hours), 'h'],
+              [pad(cd.minutes), 'min'],
+              [pad(cd.seconds), 'seg'],
+            ]
+          : [];
+        return (
+          <article className="camp" key={p.id}>
+            <div className="camp-body">
+              <IconTag />
+              <h3>{p.name}</h3>
+              <p>{promoOffer(p, names(p))}</p>
+              {cd ? (
+                <div className={cd.urgent ? 'camp-cd urgent' : 'camp-cd'} role="timer">
+                  <span className="camp-cd-label">
+                    {cd.urgent ? (cd.days === 0 ? '¡Último día!' : '¡Últimos días!') : 'Termina en'}
+                  </span>
+                  <span className="camp-cd-units">
+                    {units.map(([v, l]) => (
+                      <span className="camp-cd-unit" key={l}>
+                        {/* el reloj del servidor y el del navegador difieren: no es un error */}
+                        <span className="camp-cd-num" suppressHydrationWarning>
+                          {v}
+                        </span>
+                        <span className="camp-cd-lbl">{l}</span>
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              ) : (
+                ends && <p className="camp-ends">{`Hasta el ${ends}`}</p>
+              )}
+              <button type="button" className="camp-cta" onClick={() => go(p)}>
+                Ver productos <IconChevronRight />
+              </button>
+            </div>
+            <div className="camp-badge" aria-hidden="true">
+              <span className={badge.amount.length > 4 ? 'camp-amount long' : 'camp-amount'}>
+                {badge.amount}
+              </span>
+              <span className="camp-off">{badge.suffix}</span>
+            </div>
+          </article>
+        );
+      })}
     </section>
   );
 }

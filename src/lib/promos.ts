@@ -9,6 +9,8 @@
 //   de cupón sobre productos ya rebajados un 20% descuenta el 10% del precio rebajado).
 // - El descuento sale del subtotal de los productos alcanzados (todo el pedido, un
 //   rubro o un producto), en porcentaje o en pesos, y nunca supera ese subtotal.
+// - Un producto con precio anterior cargado (oferta propia) queda afuera de
+//   promociones y cupones: nunca se suman dos descuentos sobre lo mismo.
 
 export type PromoKind = 'percent' | 'amount';
 export type PromoScope = 'all' | 'category' | 'product';
@@ -44,6 +46,8 @@ export interface PromoItem {
   category_id: number | null;
   price: number;
   quantity: number;
+  // tiene precio anterior cargado (oferta propia): no entra en promociones
+  on_sale?: boolean;
 }
 
 // Un descuento aplicado a un pedido, tal como queda guardado
@@ -121,10 +125,18 @@ export function promoStatus(p: PromoRule, now: Date): PromoStatus {
   return w === 'soon' ? 'programada' : w === 'over' ? 'vencida' : 'activa';
 }
 
-const inScope = (p: PromoRule, it: PromoItem): boolean =>
+// ¿La promoción alcanza a este producto por su alcance? (sin mirar la oferta propia)
+const reaches = (p: PromoRule, it: PromoItem): boolean =>
   p.scope === 'all' ||
   (p.scope === 'category' && it.category_id !== null && it.category_id === p.category_id) ||
   (p.scope === 'product' && it.product_id === p.product_id);
+
+const inScope = (p: PromoRule, it: PromoItem): boolean => !it.on_sale && reaches(p, it);
+
+// Un producto con precio anterior cargado tiene una oferta propia
+export function hasManualOffer(p: { price: number; compare_price: number | null }): boolean {
+  return p.compare_price !== null && p.compare_price > p.price;
+}
 
 const pesos = (n: number) => `$ ${n.toLocaleString('es-AR')}`;
 
@@ -134,10 +146,11 @@ export function promoDiscount(
   items: PromoItem[]
 ): { amount: number; why: string | null } {
   const orderTotal = items.reduce((s, it) => s + it.price * it.quantity, 0);
-  const mine = items.filter((it) => inScope(p, it));
+  const reached = items.filter((it) => reaches(p, it));
+  const mine = reached.filter((it) => !it.on_sale);
   const qty = mine.reduce((s, it) => s + it.quantity, 0);
   const sub = mine.reduce((s, it) => s + it.price * it.quantity, 0);
-  if (!mine.length)
+  if (!reached.length)
     return {
       amount: 0,
       why:
@@ -145,6 +158,7 @@ export function promoDiscount(
           ? 'ese producto no está en el pedido'
           : 'no hay productos de ese rubro en el pedido',
     };
+  if (!mine.length) return { amount: 0, why: 'no se suma a productos que ya están en oferta' };
   if (qty < p.min_quantity)
     return { amount: 0, why: `aplica llevando ${p.min_quantity} unidades o más` };
   if (orderTotal < p.min_total)
@@ -228,8 +242,16 @@ export function formatPromoDate(d: Date | string | null): string {
   return x ? argDate.format(x) : '';
 }
 
-// "15% de descuento en Cocina llevando 3 o más · hasta el 20/10"
-export function promoSummary(
+// "llevando 3 o más", "con compras desde $ 5.000", o null si aplica tal cual
+export function conditionText(p: PromoRule): string | null {
+  const conds: string[] = [];
+  if (p.min_quantity > 1) conds.push(`llevando ${p.min_quantity} o más`);
+  if (p.min_total > 0) conds.push(`con compras desde ${pesos(p.min_total)}`);
+  return conds.length ? conds.join(' y ') : null;
+}
+
+// "15% de descuento en Cocina llevando 3 o más" (sin las fechas)
+export function promoOffer(
   p: PromoRule,
   names: { category?: string | null; product?: string | null } = {}
 ): string {
@@ -240,11 +262,87 @@ export function promoSummary(
       : p.scope === 'product'
         ? ` en ${names.product ?? 'un producto'}`
         : '';
-  const conds: string[] = [];
-  if (p.min_quantity > 1) conds.push(`llevando ${p.min_quantity} o más`);
-  if (p.min_total > 0) conds.push(`con compras desde ${pesos(p.min_total)}`);
+  const cond = conditionText(p);
+  return off + where + (cond ? ` ${cond}` : '');
+}
+
+// Lo mismo con la vigencia: "… · hasta el 20/10"
+export function promoSummary(
+  p: PromoRule,
+  names: { category?: string | null; product?: string | null } = {}
+): string {
   const from = formatPromoDate(p.starts_at);
   const to = formatPromoDate(p.ends_at);
   const when = from && to ? `del ${from} al ${to}` : to ? `hasta el ${to}` : from ? `desde el ${from}` : '';
-  return [off + where, ...conds].join(' ') + (when ? ` · ${when}` : '');
+  return promoOffer(p, names) + (when ? ` · ${when}` : '');
+}
+
+// ---------- la campaña en cada producto ----------
+
+export interface ProductPromo {
+  promo: PromoRule;
+  // precio por unidad con la campaña y el porcentaje (solo cuando es en porcentaje)
+  price: number | null;
+  percent: number | null;
+  // lo que hay que cumplir, o null si aplica tal cual
+  condition: string | null;
+}
+
+// La campaña que le toca a un producto del catálogo (si hay varias, la que más
+// descuenta), para mostrar el precio nuevo en la tarjeta y en la ficha. null si no
+// hay ninguna o si el producto tiene oferta propia.
+export function productPromo(
+  p: { id: number; category_id: number | null; price: number; compare_price: number | null },
+  promos: PromoRule[],
+  now: Date
+): ProductPromo | null {
+  if (hasManualOffer(p) || p.price <= 0) return null;
+  const item: PromoItem = { product_id: p.id, category_id: p.category_id, price: p.price, quantity: 1 };
+  let best: { promo: PromoRule; pct: number } | null = null;
+  for (const promo of promos) {
+    if (promo.code !== null || !isPromoLive(promo, now) || !reaches(promo, item)) continue;
+    const pct = promo.kind === 'percent' ? promo.value : Math.min(100, (promo.value / p.price) * 100);
+    if (!best || pct > best.pct) best = { promo, pct };
+  }
+  if (!best) return null;
+  const { promo } = best;
+  return {
+    promo,
+    percent: promo.kind === 'percent' ? promo.value : null,
+    price: promo.kind === 'percent' ? Math.round(p.price * (1 - promo.value / 100)) : null,
+    condition: conditionText(promo),
+  };
+}
+
+// La línea que acompaña al precio: "Éxitos: $ 8.000 c/u llevando 2 o más"
+export function productPromoText(pp: ProductPromo): string {
+  const { promo } = pp;
+  if (pp.price !== null && pp.condition) return `${promo.name}: ${pesos(pp.price)} c/u ${pp.condition}`;
+  if (pp.price !== null) return `${promo.name}: ${promo.value}% de descuento`;
+  return `${promo.name}: ${pesos(promo.value)} de descuento${pp.condition ? ` ${pp.condition}` : ''}`;
+}
+
+// Lo que anuncia la tarjeta de campaña en grande: "20%" / "$ 1.500" + "OFF"
+export function promoBadge(p: PromoRule): { amount: string; suffix: string } {
+  return { amount: p.kind === 'percent' ? `${p.value}%` : pesos(p.value), suffix: 'OFF' };
+}
+
+// Cuánto falta para que termine; null si no tiene fecha o ya terminó. Con menos de
+// tres días es "urgente" (la tarjeta lo resalta).
+export function countdownParts(
+  endsAt: Date | string | null,
+  now: Date
+): { days: number; hours: number; minutes: number; seconds: number; urgent: boolean } | null {
+  const end = date(endsAt);
+  if (!end) return null;
+  const ms = end.getTime() - now.getTime();
+  if (ms <= 0) return null;
+  const s = Math.floor(ms / 1000);
+  return {
+    days: Math.floor(s / 86400),
+    hours: Math.floor((s % 86400) / 3600),
+    minutes: Math.floor((s % 3600) / 60),
+    seconds: s % 60,
+    urgent: ms < 3 * 86400000,
+  };
 }

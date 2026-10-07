@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { PublicProduct, Settings } from '@/lib/data';
 import { CUSTOMER_NAME_MAX, checkCustomerPhone, parseCustomerName } from '@/lib/validate';
-import { applyPromos, type PublicPromo } from '@/lib/promos';
+import { applyPromos, hasManualOffer, productPromo, productPromoText, type PublicPromo } from '@/lib/promos';
 import {
   discountPercent,
   isOutOfStock,
@@ -19,7 +19,7 @@ import {
 import { Brand } from '@/components/Brand';
 import { ProductCard } from '@/components/ProductCard';
 import { Gallery } from '@/components/Gallery';
-import { Hero, Perks, PromoStrip } from '@/components/Hero';
+import { Campaigns, Hero, Perks } from '@/components/Hero';
 import { CategoryTiles } from '@/components/CategoryTiles';
 import { SiteFooter, WhatsAppFab } from '@/components/SiteFooter';
 import {
@@ -335,6 +335,7 @@ export function Catalog({
           category_id: x.p.category_id,
           price: x.p.price,
           quantity: x.n,
+          on_sale: hasManualOffer(x.p),
         })),
         coupon ? [...promos, coupon.promo] : promos,
         { code: coupon?.code ?? null, now: new Date() }
@@ -490,6 +491,8 @@ export function Catalog({
 
   // Datos derivados del producto abierto en la ficha
   const currentPct = current ? discountPercent(current.price, current.compare_price) : null;
+  // La campaña que le toca al producto abierto (si tiene oferta propia, ninguna)
+  const currentPromo = current ? productPromo(current, promos, new Date()) : null;
   const currentOut = current ? isOutOfStock(current.stock) : false;
   // En la ficha va la cantidad exacta ("Quedan 3 unidades"), no la etiqueta corta
   const currentStock = current
@@ -522,7 +525,13 @@ export function Catalog({
         onBrowse={browse}
       />
       <Perks settings={settings} />
-      <PromoStrip promos={promos} products={products} />
+      <Campaigns
+        promos={promos}
+        products={products}
+        onPick={pickCategory}
+        onBrowse={browse}
+        onProduct={openProduct}
+      />
       <CategoryTiles tiles={tiles} active={category} onPick={pickCategory} />
 
       <section className="tools">
@@ -566,7 +575,7 @@ export function Catalog({
             </p>
           )}
           {list.map((p) => (
-            <ProductCard key={p.id} product={p} onOpen={openProduct} />
+            <ProductCard key={p.id} product={p} promos={promos} onOpen={openProduct} />
           ))}
         </div>
       </main>
@@ -605,7 +614,13 @@ export function Catalog({
             <h2>{current.name}</h2>
             <Gallery photos={current.photos} alt={current.name} />
             <div className="price">
-              {currentPct !== null && current.compare_price !== null ? (
+              {currentPromo?.price !== null && currentPromo?.price !== undefined && !currentPromo.condition ? (
+                // campaña que aplica tal cual: el precio de lista tachado y el nuevo
+                <>
+                  <s>{money(current.price)}</s> {money(currentPromo.price)}
+                  <span className="pct">{`-${currentPromo.percent}%`}</span>
+                </>
+              ) : currentPct !== null && current.compare_price !== null ? (
                 <>
                   <s>{money(current.compare_price)}</s> {money(current.price)}
                   <span className="pct">{`-${currentPct}%`}</span>
@@ -615,6 +630,7 @@ export function Catalog({
               )}{' '}
               <small>por unidad</small>
             </div>
+            {currentPromo && <p className="promo-line">{productPromoText(currentPromo)}</p>}
             {currentStock && (
               <p className={currentOut ? 'stock-note out' : 'stock-note'}>
                 {currentStock}

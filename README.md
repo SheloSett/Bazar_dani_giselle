@@ -155,11 +155,17 @@ producto), con condiciones opcionales: mínimo de unidades de esos productos,
 compra mínima del pedido, vigencia (fechas en hora argentina, el día de fin
 completo) y, para cupones, un máximo de usos. Se pausan y reactivan desde la lista.
 
-- Si hay varias promociones automáticas que aplican, se usa la que más descuenta;
-  no se suman entre sí. El descuento nunca supera el subtotal de los productos
-  alcanzados.
-- Las promociones vigentes se anuncian en el catálogo debajo de los beneficios; los
-  códigos de cupón nunca viajan al navegador. El catálogo verifica un cupón con
+- Si hay varias campañas que aplican, se usa la que más descuenta; no se suman
+  entre sí. El cupón se suma y se calcula sobre los precios ya rebajados. El
+  descuento nunca supera el subtotal de los productos alcanzados.
+- Los productos con **precio anterior** cargado (oferta propia) quedan afuera de
+  campañas y cupones: nunca se suman dos descuentos sobre lo mismo (misma regla que
+  en IGWT Store).
+- Las campañas vigentes se anuncian en el catálogo con una tarjeta grande debajo de
+  los beneficios (descuento en grande, cuenta regresiva si tiene fecha de fin, botón
+  a los productos alcanzados), y cada producto alcanzado muestra el precio de lista
+  tachado y el precio con descuento (o, si la campaña tiene mínimos, la condición).
+  Los códigos de cupón nunca viajan al navegador. El catálogo verifica un cupón con
   `POST /api/promos/coupon` (con límite de intentos) y recalcula el descuento
   mientras el pedido cambia.
 - El descuento real lo calcula el servidor al guardar el pedido, con los precios de

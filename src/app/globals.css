@@ -106,7 +106,7 @@ img { max-width: 100%; }
 }
 /* logo grande en la portada; en el encabezado va chico */
 .hero-logo {
-  display: block; height: 150px; width: auto; max-width: 280px;
+  display: block; height: 230px; width: auto; max-width: 380px;
   object-fit: contain; object-position: left center; margin-bottom: 18px;
 }
 .eyebrow {
@@ -138,7 +138,7 @@ img { max-width: 100%; }
   .hero-pics > .fit { aspect-ratio: 1 / 1; height: auto; border-radius: 12px; }
   .hero-pics > .fit:first-child { grid-row: auto; }
   .hero-cta .btn { flex: 1 1 auto; }
-  .hero-logo { height: 112px; max-width: 220px; margin-bottom: 14px; }
+  .hero-logo { height: 170px; max-width: 280px; margin-bottom: 14px; }
 }
 
 /* ---------- beneficios ---------- */
@@ -235,16 +235,64 @@ img { max-width: 100%; }
   .rubro-txt small { font-size: 0.76rem; }
 }
 
-/* ---------- promociones vigentes (debajo de los beneficios) ---------- */
-.promo-strip { max-width: var(--wrap); margin: 0 auto; padding: 14px 20px 0; }
-.promo-strip ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.promo-strip li {
-  display: flex; align-items: center; gap: 10px; padding: 11px 14px;
-  border-radius: 12px; background: #fff6dd; border: 1px solid #f0d58a; color: #5c4300;
-  font-size: 0.92rem; line-height: 1.4;
+/* ---------- campañas vigentes: tarjetas grandes debajo de los beneficios ---------- */
+.campaigns { max-width: var(--wrap); margin: 0 auto; padding: 16px 20px 0; display: grid; gap: 14px; }
+.camp {
+  position: relative; overflow: hidden; display: flex; align-items: center;
+  justify-content: space-between; gap: 24px; padding: 28px 34px; border-radius: 22px;
+  color: #fff; background: linear-gradient(120deg, #0f7a4e 0%, #0a4a31 100%);
 }
-.promo-strip .ic { width: 1.15em; height: 1.15em; flex: 0 0 auto; }
-.promo-strip strong { font-weight: 800; }
+/* círculos de adorno, como las tarjetas de campaña de la otra tienda */
+.camp::before, .camp::after {
+  content: ''; position: absolute; border-radius: 999px; pointer-events: none;
+  background: rgba(255, 255, 255, 0.08);
+}
+.camp::before { width: 280px; height: 280px; right: -70px; top: -140px; }
+.camp::after { width: 170px; height: 170px; right: 150px; bottom: -110px; }
+.camp-body { position: relative; z-index: 1; min-width: 0; display: grid; gap: 6px; justify-items: start; }
+.camp-body .ic { width: 1.6em; height: 1.6em; color: #cfe9d9; }
+.camp h3 { margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.camp p { margin: 0; color: #d6ecdf; font-size: 1rem; }
+.camp-ends { font-weight: 700; }
+.camp-cd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.camp-cd-label {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #d6ecdf;
+}
+.camp-cd-units { display: flex; gap: 6px; }
+.camp-cd-unit {
+  display: grid; place-items: center; min-width: 46px; padding: 5px 6px; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16); line-height: 1.1;
+}
+.camp-cd-num { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.camp-cd-lbl { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #d6ecdf; }
+.camp-cd.urgent .camp-cd-unit { background: rgba(255, 92, 72, 0.4); }
+.camp-cd.urgent .camp-cd-label { color: #ffd2cb; }
+.camp-cta {
+  margin-top: 8px; display: inline-flex; align-items: center; gap: 4px;
+  color: #fff; font-weight: 800; font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.14); border-radius: 999px; padding: 9px 14px 9px 18px;
+}
+.camp-cta .ic { width: 1.1em; height: 1.1em; }
+@media (hover: hover) { .camp-cta:hover { background: rgba(255, 255, 255, 0.24); } }
+.camp-badge { position: relative; z-index: 1; flex: 0 0 auto; text-align: center; line-height: 1; padding-right: 10px; }
+.camp-amount { display: block; font-size: 3.6rem; font-weight: 900; letter-spacing: -0.03em; }
+.camp-amount.long { font-size: 2.2rem; }
+.camp-off { display: block; font-size: 0.95rem; font-weight: 800; letter-spacing: 0.3em; margin-top: 6px; }
+@media (max-width: 720px) {
+  .campaigns { padding-top: 12px; }
+  .camp { padding: 22px 20px; gap: 14px; border-radius: 18px; }
+  .camp h3 { font-size: 1.35rem; }
+  .camp p { font-size: 0.92rem; }
+  .camp-amount { font-size: 2.6rem; }
+  .camp-amount.long { font-size: 1.6rem; }
+  .camp::before { width: 190px; height: 190px; right: -80px; top: -100px; }
+  .camp::after { display: none; }
+}
+@media (max-width: 480px) {
+  .camp { flex-direction: column; align-items: flex-start; }
+  .camp-badge { align-self: flex-end; padding-right: 0; }
+}
 
 /* ---------- herramientas ---------- */
 .tools {
@@ -309,6 +357,9 @@ img { max-width: 100%; }
   font-variant-numeric: tabular-nums;
 }
 .item .price s { color: var(--soft); font-weight: 500; font-size: 0.86em; margin-right: 6px; }
+/* la campaña que alcanza al producto: debajo del precio, en la tarjeta y en la ficha */
+.promo-line { display: block; color: var(--accent); font-weight: 700; font-size: 0.8rem; line-height: 1.35; }
+.sheet .promo-line { margin: 6px 0 0; font-size: 0.9rem; }
 
 /* etiquetas sobre la foto */
 .badge {

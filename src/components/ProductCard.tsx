@@ -9,19 +9,26 @@ import {
   stockLabel,
   thumbUrl,
 } from '@/lib/catalog';
+import { productPromo, productPromoText, type PublicPromo } from '@/lib/promos';
 import { useSnapStrip } from '@/components/useSnapStrip';
 import { FitPhoto } from '@/components/FitPhoto';
 import { IconChevronLeft, IconChevronRight, IconPhoto } from '@/components/icons';
 
 export function ProductCard({
   product: p,
+  promos = [],
   onOpen,
 }: {
   product: PublicProduct;
+  // campañas vigentes: si una alcanza al producto, se muestra el precio con descuento
+  promos?: PublicPromo[];
   onOpen: (p: PublicProduct) => void;
 }) {
   const strip = useSnapStrip(p.photos.length);
   const pct = discountPercent(p.price, p.compare_price);
+  const promo = productPromo(p, promos, new Date());
+  // precio nuevo directo solo si la campaña aplica tal cual (sin mínimos)
+  const promoPrice = promo && promo.price !== null && !promo.condition ? promo.price : null;
   const out = isOutOfStock(p.stock);
   const low = out ? null : stockLabel(p.stock);
   const lowDetail = stockDetail(p.stock);
@@ -47,7 +54,11 @@ export function ProductCard({
           </div>
         )}
 
-        {pct !== null && <span className="badge off">{`-${pct}%`}</span>}
+        {promoPrice !== null ? (
+          <span className="badge off">{`-${promo!.percent}%`}</span>
+        ) : (
+          pct !== null && <span className="badge off">{`-${pct}%`}</span>
+        )}
         {low && (
           // Con el mouse encima muestra cuántas quedan; el clic abre el producto como
           // el resto de la tarjeta (en el celular la cantidad se ve en la ficha)
@@ -90,9 +101,19 @@ export function ProductCard({
       <button type="button" className="info" onClick={open}>
         <span className="name">{p.name}</span>
         <span className="price">
-          {pct !== null && p.compare_price !== null && <s>{money(p.compare_price)}</s>}
-          {money(p.price)}
+          {promoPrice !== null ? (
+            <>
+              <s>{money(p.price)}</s>
+              {money(promoPrice)}
+            </>
+          ) : (
+            <>
+              {pct !== null && p.compare_price !== null && <s>{money(p.compare_price)}</s>}
+              {money(p.price)}
+            </>
+          )}
         </span>
+        {promo && <span className="promo-line">{productPromoText(promo)}</span>}
       </button>
     </article>
   );

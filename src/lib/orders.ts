@@ -3,7 +3,7 @@
 
 import { isUniqueViolation, query, transaction } from '@/lib/db';
 import { planStock, type ShortItem, type StockLine } from '@/lib/order-rules';
-import { applyPromos, type DiscountLine } from '@/lib/promos';
+import { applyPromos, hasManualOffer, type DiscountLine } from '@/lib/promos';
 import { consumeCoupon, promosForOrder } from '@/lib/promos-data';
 import { sameOrderItems } from '@/lib/validate';
 
@@ -115,10 +115,11 @@ export async function createOrder(
     id: number;
     name: string;
     price: number;
+    compare_price: number | null;
     category_id: number | null;
     photo: string | null;
   }>(
-    `SELECT p.id, p.name, p.price, p.category_id,
+    `SELECT p.id, p.name, p.price, p.compare_price, p.category_id,
             (SELECT ph.filename FROM product_photos ph
               WHERE ph.product_id = p.id ORDER BY ph.position, ph.id LIMIT 1) AS photo
      FROM products p
@@ -146,6 +147,7 @@ export async function createOrder(
       category_id: l.category_id,
       price: l.price,
       quantity: l.quantity,
+      on_sale: hasManualOffer(l),
     })),
     promos,
     { code: couponCode, now: new Date() }
