@@ -104,6 +104,11 @@ img { max-width: 100%; }
   display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   align-items: center; gap: 32px; padding: 40px 40px 40px 52px;
 }
+/* logo grande en la portada; en el encabezado va chico */
+.hero-logo {
+  display: block; height: 150px; width: auto; max-width: 280px;
+  object-fit: contain; object-position: left center; margin-bottom: 18px;
+}
 .eyebrow {
   font-size: 0.74rem; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--accent);
@@ -133,6 +138,7 @@ img { max-width: 100%; }
   .hero-pics > .fit { aspect-ratio: 1 / 1; height: auto; border-radius: 12px; }
   .hero-pics > .fit:first-child { grid-row: auto; }
   .hero-cta .btn { flex: 1 1 auto; }
+  .hero-logo { height: 112px; max-width: 220px; margin-bottom: 14px; }
 }
 
 /* ---------- beneficios ---------- */
@@ -218,11 +224,15 @@ img { max-width: 100%; }
 @media (max-width: 720px) {
   .rubros { padding-top: 34px; }
   .rubros-wrap { margin-top: 14px; }
+  /* en el celular, grilla de a dos que baja (pedido del cliente), no una tira deslizable */
   .rubros-grid {
-    --gap: 12px; scroll-snap-type: none;
-    margin: 0 -20px; padding: 4px 20px;
+    --gap: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible; scroll-snap-type: none; margin: -4px; padding: 4px;
   }
-  .rubro { flex: 0 0 62%; }
+  .rubro { flex: none; }
+  .rubro-txt { left: 12px; right: 12px; bottom: 10px; }
+  .rubro-txt strong { font-size: 0.98rem; }
+  .rubro-txt small { font-size: 0.76rem; }
 }
 
 /* ---------- herramientas ---------- */
@@ -606,8 +616,12 @@ img { max-width: 100%; }
 .legal section p { margin: 8px 0 0; }
 .legal ul { margin: 8px 0 0; padding-left: 20px; }
 .legal li { margin: 3px 0; }
-.legal .ord-top a { text-decoration: none; color: inherit; }
-.legal .ord-top .ord-back { color: var(--accent); }
+/* encabezado de las páginas legales: la marca lleva al catálogo, y el botón también */
+.brand-link { display: inline-flex; text-decoration: none; color: inherit; min-width: 0; }
+.btn-back { padding: 10px 16px 10px 12px; font-size: 0.88rem; white-space: nowrap; }
+.btn-back .ic { width: 1.1em; height: 1.1em; }
+@media (max-width: 560px) { .btn-back { padding: 8px 12px 8px 8px; font-size: 0.8rem; } }
+.legal { padding-top: 10px; }
 .legal-foot {
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px;
   margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--line);

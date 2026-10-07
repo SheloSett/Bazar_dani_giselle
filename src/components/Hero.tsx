@@ -1,10 +1,12 @@
 'use client';
 
 import type { Settings } from '@/lib/data';
+import { thumbUrl } from '@/lib/catalog';
 import { IconStore, IconTruck, IconWhatsApp } from '@/components/icons';
 import { FitPhoto } from '@/components/FitPhoto';
 
-// Portada: bloque de color con el título, los botones y un collage de fotos
+// Portada: bloque de color con el logo en grande (pedido del cliente: el del
+// encabezado queda chico), el título, los botones y un collage de fotos
 export function Hero({
   settings,
   stats,
@@ -22,6 +24,10 @@ export function Hero({
     <section className="hero">
       <div className="hero-in">
         <div className="hero-copy">
+          {settings.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="hero-logo" src={thumbUrl(settings.logo)} alt={settings.shop_name} />
+          )}
           <span className="eyebrow">{stats}</span>
           <h1>{settings.tagline || settings.shop_name}</h1>
           {settings.footer_note && <p>{settings.footer_note}</p>}

@@ -36,6 +36,15 @@ const CART_KEY = 'catalogo-cart';
 const CART_NAMES_KEY = 'catalogo-cart-nombres';
 // Nombre y teléfono de quien pide: se recuerdan en este navegador para el próximo pedido
 const CUSTOMER_KEY = 'catalogo-cliente';
+
+// Qué panel quedó abierto, guardado en la entrada del historial (ver openProduct)
+type SheetState = { product: number | null; cart: boolean };
+const sheetsIn = (state: unknown): SheetState => {
+  const s = (state as { sheets?: Partial<SheetState> } | null)?.sheets;
+  return { product: s?.product ?? null, cart: !!s?.cart };
+};
+const pushSheets = (sheets: SheetState) =>
+  window.history.pushState({ ...window.history.state, sheets }, '');
 // Último código de pedido con la firma de su contenido: el mismo carrito con los
 // mismos datos reusa el mismo código, incluso después de recargar la página
 const ORDER_TOKEN_KEY = 'catalogo-pedido-token';
@@ -147,6 +156,39 @@ export function Catalog({
     toastTimer.current = setTimeout(() => setToast(''), ms);
   }, []);
 
+  // Los paneles (ficha de producto y pedido) entran en el historial del navegador:
+  // en el celular, el botón "atrás" cierra el panel en vez de irse de la página.
+  // Al abrir uno se agrega una entrada que dice qué quedó abierto; al tocar "atrás"
+  // el navegador avisa (popstate) y se muestra lo que diga la entrada a la que
+  // volvió. Cerrar con la X, el fondo o Escape hace history.back(), así no queda
+  // una entrada colgada que obligue a tocar "atrás" dos veces.
+  const openProduct = (p: PublicProduct) => {
+    setCurrent(p);
+    setQty(1);
+    pushSheets({ product: p.id, cart: false });
+  };
+  const openCart = () => {
+    setCartOpen(true);
+    pushSheets({ product: null, cart: true });
+  };
+  const closeSheets = useCallback(() => {
+    const open = sheetsIn(window.history.state);
+    if (open.product !== null || open.cart) window.history.back();
+    else {
+      setCurrent(null);
+      setCartOpen(false);
+    }
+  }, []);
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const s = sheetsIn(e.state);
+      setCurrent(s.product === null ? null : (products.find((p) => p.id === s.product) ?? null));
+      setCartOpen(s.cart);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [products]);
+
   // Con un panel abierto (ficha o pedido): Escape lo cierra y la página de atrás no
   // se desliza
   const sheetOpen = current !== null || cartOpen;
@@ -154,8 +196,7 @@ export function Catalog({
     if (!sheetOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      setCurrent(null);
-      setCartOpen(false);
+      closeSheets();
     };
     document.addEventListener('keydown', onKey);
     const before = document.body.style.overflow;
@@ -164,7 +205,7 @@ export function Catalog({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = before;
     };
-  }, [sheetOpen]);
+  }, [sheetOpen, closeSheets]);
 
   // Carga el carrito guardado. Si algún producto ya no está en el catálogo (se ocultó o
   // se borró desde el panel), lo saca y avisa, en vez de hacerlo desaparecer en silencio.
@@ -322,11 +363,6 @@ export function Catalog({
     browse();
   };
 
-  const openProduct = (p: PublicProduct) => {
-    setCurrent(p);
-    setQty(1);
-  };
-
   const addToCart = () => {
     if (!current) return;
     const have = cart[current.id] || 0;
@@ -345,7 +381,7 @@ export function Catalog({
     updateCart({ ...cart, [current.id]: next });
     rememberName(current.id, current.name);
     showToast(`Agregado: ${current.name} × ${next - have}`);
-    setCurrent(null);
+    closeSheets();
   };
 
   const changeQty = (id: number, delta: number) => {
@@ -375,7 +411,7 @@ export function Catalog({
           <Brand name={settings.shop_name} logo={settings.logo} withName={settings.logo_with_name} />
           <button
             className="btn-cart"
-            onClick={() => setCartOpen(true)}
+            onClick={openCart}
             aria-label="Ver pedido"
           >
             <IconBasket /> Pedido <span className="n">{count}</span>
@@ -451,7 +487,7 @@ export function Catalog({
 
       {count > 0 && (
         <div className="order-bar">
-          <button onClick={() => setCartOpen(true)}>
+          <button onClick={openCart}>
             <span>
               Ver pedido — {count} {count === 1 ? 'producto' : 'productos'}
             </span>
@@ -463,10 +499,10 @@ export function Catalog({
       {current && (
         <div
           className="overlay"
-          onClick={(e) => e.target === e.currentTarget && setCurrent(null)}
+          onClick={(e) => e.target === e.currentTarget && closeSheets()}
         >
           <div className="sheet" role="dialog" aria-modal="true" aria-label="Detalle del producto">
-            <button className="close" onClick={() => setCurrent(null)} aria-label="Cerrar">
+            <button className="close" onClick={closeSheets} aria-label="Cerrar">
               <IconClose />
             </button>
             {current.category && <span className="cat">{current.category}</span>}
@@ -528,10 +564,10 @@ export function Catalog({
       {cartOpen && (
         <div
           className="overlay"
-          onClick={(e) => e.target === e.currentTarget && setCartOpen(false)}
+          onClick={(e) => e.target === e.currentTarget && closeSheets()}
         >
           <div className="sheet" role="dialog" aria-modal="true" aria-label="Tu pedido">
-            <button className="close" onClick={() => setCartOpen(false)} aria-label="Cerrar">
+            <button className="close" onClick={closeSheets} aria-label="Cerrar">
               <IconClose />
             </button>
             <h2>Tu pedido</h2>
