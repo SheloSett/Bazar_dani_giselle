@@ -34,6 +34,10 @@ services:
       UPLOAD_DIR: /app/uploads
       # Opcional: URL pública para la vista previa al compartir el link
       SITE_URL: ${SITE_URL:-}
+      # Opcional: fotos en Cloudinary en vez del disco del servidor (ver README).
+      # Es la "API environment variable" que muestra el panel de Cloudinary.
+      CLOUDINARY_URL: ${CLOUDINARY_URL:-}
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-}
     volumes:
       - uploads:/app/uploads
     # Solo en 127.0.0.1: desde afuera se entra por el proxy (Caddy), que le pone

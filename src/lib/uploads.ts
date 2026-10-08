@@ -2,6 +2,18 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import sharp from 'sharp';
 import { thumbName } from '@/lib/catalog';
+import {
+  cloudinaryConfig,
+  deliveryUrl,
+  destroyInCloudinary,
+  fetchFromCloudinary,
+  uploadToCloudinary,
+} from '@/lib/cloudinary';
+
+// Las fotos se guardan en el disco (UPLOAD_DIR) o, si está configurada
+// CLOUDINARY_URL, en Cloudinary (ver lib/cloudinary.ts). Al leer se mira primero
+// el disco y después Cloudinary: un sitio que pasa de uno a otro sigue mostrando
+// todo mientras se migran las fotos viejas (scripts/fotos-a-cloudinary.mjs).
 
 export const UPLOAD_DIR =
   process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
@@ -29,6 +41,18 @@ export function isSafeFilename(filename: string): boolean {
 export function mimeForFilename(filename: string): string | null {
   if (!isSafeFilename(filename)) return null;
   return MIME_BY_EXT[path.extname(filename)] ?? null;
+}
+
+// Dónde van las fotos nuevas (para mostrarlo en Ajustes)
+export type PhotoStorage =
+  | { kind: 'disk'; dir: string }
+  | { kind: 'cloudinary'; cloud: string; folder: string };
+
+export function photoStorage(): PhotoStorage {
+  const cloud = cloudinaryConfig();
+  return cloud
+    ? { kind: 'cloudinary', cloud: cloud.cloud, folder: cloud.folder }
+    : { kind: 'disk', dir: UPLOAD_DIR };
 }
 
 // Tipo real de la imagen según sus primeros bytes. No se confía en el tipo que
@@ -81,6 +105,19 @@ export async function savePhoto(file: File): Promise<string> {
   }
 
   const filename = `${crypto.randomUUID()}.webp`;
+  const cloud = cloudinaryConfig();
+  if (cloud) {
+    await uploadToCloudinary(cloud, filename, processed.full);
+    try {
+      await uploadToCloudinary(cloud, thumbName(filename), processed.thumb);
+    } catch (err) {
+      // Sin miniatura la foto no sirve: no dejar la grande huérfana
+      await destroyInCloudinary(cloud, filename);
+      throw err;
+    }
+    return filename;
+  }
+
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
   await Promise.all([
     fs.writeFile(path.join(UPLOAD_DIR, filename), processed.full),
@@ -104,30 +141,42 @@ export async function photoSize(
   filename: string
 ): Promise<{ width: number; height: number } | null> {
   if (!isSafeFilename(filename)) return null;
+  const found = await readUpload(filename);
+  if (!found) return null;
   try {
-    const meta = await sharp(await fs.readFile(path.join(UPLOAD_DIR, filename))).metadata();
+    const meta = await sharp(found.data).metadata();
     return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
   } catch {
     return null;
   }
 }
 
+// Borra la foto y su miniatura de donde estén (disco y, si corresponde, Cloudinary)
 export async function removePhotoFile(filename: string): Promise<void> {
   if (!isSafeFilename(filename)) return;
-  await Promise.all(
-    [filename, thumbName(filename)].map((f) =>
-      fs.unlink(path.join(UPLOAD_DIR, f)).catch(() => {})
-    )
-  );
+  const names = [filename, thumbName(filename)];
+  const cloud = cloudinaryConfig();
+  await Promise.all([
+    ...names.map((f) => fs.unlink(path.join(UPLOAD_DIR, f)).catch(() => {})),
+    ...(cloud ? names.map((f) => destroyInCloudinary(cloud, f)) : []),
+  ]);
 }
 
-// Resuelve un nombre pedido por URL a un archivo real. Acepta la foto
-// (uuid.ext) y su miniatura (uuid.t.webp); si la miniatura no existe (fotos
-// subidas antes de esta versión) sirve la foto original en su lugar.
-export async function readUpload(name: string): Promise<{ data: Buffer; mime: string } | null> {
+// Nombres a probar para un nombre pedido por URL. Acepta la foto (uuid.ext) y su
+// miniatura (uuid.t.webp); si la miniatura no existe (fotos subidas antes de esta
+// versión) se sirve la foto original en su lugar.
+function candidatesFor(name: string): string[] | null {
   const m = /^([\w-]+)(\.t)?\.(jpg|png|webp|avif)$/.exec(name);
   if (!m) return null;
-  const candidates = m[2] ? [name, ...EXTS.map((e) => `${m[1]}.${e}`)] : [name];
+  return m[2] ? [name, ...EXTS.map((e) => `${m[1]}.${e}`)] : [name];
+}
+
+// Foto o miniatura guardada en el disco, o null
+export async function readLocalUpload(
+  name: string
+): Promise<{ data: Buffer; mime: string } | null> {
+  const candidates = candidatesFor(name);
+  if (!candidates) return null;
   for (const c of candidates) {
     try {
       const data = await fs.readFile(path.join(UPLOAD_DIR, c));
@@ -139,6 +188,27 @@ export async function readUpload(name: string): Promise<{ data: Buffer; mime: st
   return null;
 }
 
+// Foto o miniatura, esté en el disco o en Cloudinary (se bajan sus bytes)
+export async function readUpload(name: string): Promise<{ data: Buffer; mime: string } | null> {
+  const local = await readLocalUpload(name);
+  if (local) return local;
+  const cloud = cloudinaryConfig();
+  const candidates = cloud && candidatesFor(name);
+  if (!cloud || !candidates) return null;
+  for (const c of candidates) {
+    const data = await fetchFromCloudinary(cloud, c);
+    if (data) return { data, mime: MIME_BY_EXT[path.extname(c)] };
+  }
+  return null;
+}
+
+// URL de la foto en Cloudinary (para redirigir al navegador), o null si las fotos
+// van al disco o el nombre no vale
+export function cloudPhotoUrl(name: string): string | null {
+  const cloud = cloudinaryConfig();
+  return cloud ? deliveryUrl(cloud, name) : null;
+}
+
 // Foto original a partir de su nombre sin extensión (para /og/<nombre>.jpg)
 export async function readUploadByBase(base: string): Promise<Buffer | null> {
   if (!/^[\w-]+$/.test(base)) return null;
@@ -147,6 +217,13 @@ export async function readUploadByBase(base: string): Promise<Buffer | null> {
       return await fs.readFile(path.join(UPLOAD_DIR, `${base}.${e}`));
     } catch {
       /* siguiente extensión */
+    }
+  }
+  const cloud = cloudinaryConfig();
+  if (cloud) {
+    for (const e of EXTS) {
+      const data = await fetchFromCloudinary(cloud, `${base}.${e}`);
+      if (data) return data;
     }
   }
   return null;

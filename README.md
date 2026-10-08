@@ -8,9 +8,10 @@ que apunte siempre a la misma URL.
 
 - **Next.js 15** (React 19, App Router, output standalone)
 - **PostgreSQL 16** en Docker (sin ORM: `pg` + SQL plano en `db/`)
-- Fotos guardadas en disco (`uploads/`, volumen en Docker), optimizadas al subir con
-  `sharp`: rotación corregida, máximo 1200 px, WebP, sin metadatos, más una miniatura
-  para la grilla
+- Fotos optimizadas al subir con `sharp` (rotación corregida, máximo 1200 px, WebP,
+  sin metadatos, más una miniatura para la grilla), guardadas en disco (`uploads/`,
+  volumen en Docker) o en Cloudinary si está configurada `CLOUDINARY_URL` (ver
+  "Fotos en Cloudinary")
 - Sesión de admin con cookie firmada (HMAC) — sin dependencias de auth externas
 
 ## Estructura
@@ -21,6 +22,7 @@ db/seed.sql            datos de ejemplo (solo en una base nueva)
 scripts/migrate.mjs    aplica schema + seed; corre al arrancar el contenedor
 scripts/reset-password.mjs   vuelve a la clave inicial del .env si se olvidó la del panel
 scripts/backup.sh      backup de la base y las fotos (correrlo por cron en el VPS)
+scripts/fotos-a-cloudinary.mjs   pasa a Cloudinary las fotos que ya están en el disco (una vez)
 src/middleware.ts      protege /admin con la cookie de sesión
 src/lib/               db, auth, clave del admin, límite de intentos, queries, validación, uploads
 src/app/page.tsx       catálogo público (server component)
@@ -232,6 +234,40 @@ gunzip -c backups/db-FECHA.sql.gz | docker compose exec -T db psql -U bazar baza
 docker compose exec -T app tar -xzf - -C /app < backups/uploads-FECHA.tgz
 ```
 
+### Fotos en Cloudinary
+
+Por defecto las fotos quedan en el disco del VPS (volumen `uploads`). Si se prefiere
+tenerlas en Cloudinary (las sirve su CDN y el VPS no gasta disco ni ancho de banda en
+fotos), alcanza con una variable:
+
+1. En Cloudinary, Settings → API Keys: copiar la "API environment variable", que
+   tiene la forma `cloudinary://<api_key>:<api_secret>@<cloud_name>`.
+2. En el VPS, agregarla al `.env` del proyecto:
+
+   ```
+   CLOUDINARY_URL=cloudinary://...
+   ```
+
+   Opcional: `CLOUDINARY_FOLDER=bazar` cambia la carpeta dentro de la cuenta.
+3. `docker compose up -d` para que la app la tome. Desde ese momento las fotos nuevas
+   van a Cloudinary; en Ajustes del panel se ve dónde se están guardando.
+4. Pasar las fotos que ya estaban en el disco, una sola vez:
+
+   ```bash
+   docker compose exec app node scripts/fotos-a-cloudinary.mjs
+   ```
+
+   Si suben todas, repetirlo con `--borrar` saca las copias locales (hasta entonces
+   la app las sigue sirviendo del disco).
+
+Cómo funciona: la app sube la foto ya procesada (WebP y miniatura) con la API de
+Cloudinary (`src/lib/cloudinary.ts`, sin SDK) y la ruta `/uploads/<foto>` redirige al
+CDN de Cloudinary cuando la foto no está en el disco, así las URLs del catálogo no
+cambian. Al borrar una foto desde el panel se borra también en Cloudinary. El backup
+de `scripts/backup.sh` sigue guardando lo que haya en el disco; de las fotos en
+Cloudinary se encarga Cloudinary. Para volver al disco habría que bajar las fotos de
+Cloudinary a `uploads/` antes de quitar la variable (no hay script para eso).
+
 ### Publicarla con Caddy
 
 Con Caddy instalado en el mismo servidor:
@@ -270,8 +306,9 @@ el proxy.
 ## Seguridad
 
 - Todas las respuestas llevan cabeceras de seguridad (`next.config.mjs`): política de
-  contenido que solo permite recursos del propio sitio, no se puede embeber en otra
-  página, y HTTPS obligatorio una vez que se entró por HTTPS.
+  contenido que solo permite recursos del propio sitio (más el CDN de Cloudinary para
+  las fotos), no se puede embeber en otra página, y HTTPS obligatorio una vez que se
+  entró por HTTPS.
 - El optimizador de imágenes de Next (`/_next/image`) está cerrado: el sitio no lo
   usa y abierto permitía gastarle procesador y disco al servidor.
 - Las rutas del panel que cambian algo solo aceptan pedidos que salen del propio

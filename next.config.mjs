@@ -1,14 +1,25 @@
 const dev = process.env.NODE_ENV !== 'production';
 
-// Política de contenido: todo sale del propio sitio. Las imágenes pueden ser data: o
-// blob: (vistas previas del panel antes de subir). Next inyecta scripts y estilos en
+// Con las fotos en Cloudinary (CLOUDINARY_URL), el navegador las baja de su CDN.
+// CLOUDINARY_DELIVERY_BASE solo se cambia en pruebas, para apuntar a un servidor local.
+const photoHosts = ['https://res.cloudinary.com'];
+if (process.env.CLOUDINARY_DELIVERY_BASE) {
+  try {
+    photoHosts.push(new URL(process.env.CLOUDINARY_DELIVERY_BASE).origin);
+  } catch {
+    /* una URL inválida se ignora */
+  }
+}
+
+// Política de contenido: todo sale del propio sitio, salvo las fotos cuando están en
+// Cloudinary. Las imágenes pueden ser data: o blob: (vistas previas del panel antes de subir). Next inyecta scripts y estilos en
 // línea, por eso 'unsafe-inline'; en desarrollo además necesita eval y el websocket
 // de recarga.
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${photoHosts.join(' ')}`,
   "font-src 'self' data:",
   `connect-src 'self'${dev ? ' ws: wss:' : ''}`,
   "frame-ancestors 'none'",
