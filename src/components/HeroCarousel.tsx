@@ -14,8 +14,9 @@ import { IconChevronLeft, IconChevronRight } from '@/components/icons';
 // Cada cuánto pasa sola a la siguiente
 const AUTO_MS = 6000;
 
-// Lo que la frena: el mouse encima, el foco del teclado adentro o el dedo apoyado
-type Hold = 'hover' | 'focus' | 'touch';
+// Lo que la frena: el mouse encima, el foco del teclado adentro, el dedo apoyado o
+// que casi no se vea (se bajó a mirar los productos)
+type Hold = 'hover' | 'focus' | 'touch' | 'away';
 
 // Portada con banners: las imágenes se deslizan (con el dedo, las flechas o los
 // puntos) y pasan solas. Se frena mientras se está mirando o usando (ver Hold),
@@ -27,10 +28,13 @@ export function HeroCarousel({ slides }: { slides: ReactNode[] }) {
     hover: false,
     focus: false,
     touch: false,
+    away: false,
   });
-  const paused = holds.hover || holds.focus || holds.touch;
-  const hold = (key: Hold, on: boolean) =>
-    setHolds((h) => (h[key] === on ? h : { ...h, [key]: on }));
+  const paused = holds.hover || holds.focus || holds.touch || holds.away;
+  const hold = useCallback(
+    (key: Hold, on: boolean) => setHolds((h) => (h[key] === on ? h : { ...h, [key]: on })),
+    []
+  );
   const n = slides.length;
 
   const go = useCallback((i: number) => {
@@ -65,6 +69,36 @@ export function HeroCarousel({ slides }: { slides: ReactNode[] }) {
     }, AUTO_MS);
     return () => window.clearTimeout(t);
   }, [index, paused, n, go]);
+
+  // Con menos de la mitad a la vista no pasa sola: en el celular cambia de alto (ver
+  // abajo) y movería lo que se está mirando más abajo
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => hold('away', e.intersectionRatio < 0.5), {
+      threshold: [0, 0.5, 1],
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hold]);
+
+  // En el celular cada imagen tiene su alto (la portada con el logo es más alta que un
+  // banner) y la tira toma el de la que se ve. En la compu todas se estiran al de la
+  // más alta (align-items: stretch) y no se le fija ninguno.
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    const fit = () => {
+      const slide = el.children[index] as HTMLElement | undefined;
+      const own = getComputedStyle(el).alignItems === 'flex-start';
+      el.style.height = own && slide ? `${slide.offsetHeight}px` : '';
+    };
+    fit();
+    // cambia con el ancho de la pantalla y cuando terminan de cargar letras y fotos
+    const ro = new ResizeObserver(fit);
+    for (const child of Array.from(el.children)) ro.observe(child);
+    return () => ro.disconnect();
+  }, [index]);
 
   return (
     <section
@@ -112,16 +146,35 @@ export function HeroCarousel({ slides }: { slides: ReactNode[] }) {
           <IconChevronRight />
         </button>
       </div>
+      {/* En el celular las flechas van acá, a los lados de los puntos: sobre la
+          portada taparían el texto. Con mouse van a los costados de la imagen. */}
       <div className="hero-dots">
+        <button
+          type="button"
+          className="hero-step"
+          onClick={() => go((index - 1 + n) % n)}
+          aria-label="Imagen anterior"
+        >
+          <IconChevronLeft />
+        </button>
         {slides.map((_, i) => (
           <button
             key={i}
             type="button"
+            className="hero-dot"
             aria-label={`Ver imagen ${i + 1} de ${n}`}
             aria-current={i === index ? 'true' : undefined}
             onClick={() => go(i)}
           />
         ))}
+        <button
+          type="button"
+          className="hero-step"
+          onClick={() => go((index + 1) % n)}
+          aria-label="Imagen siguiente"
+        >
+          <IconChevronRight />
+        </button>
       </div>
     </section>
   );

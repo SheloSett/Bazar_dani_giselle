@@ -156,9 +156,10 @@ export function BannerManager({ initial, max }: { initial: Banner[]; max: number
         Sin banners, la portada queda fija. Con alguno, la portada pasa a ser un carrusel:
         primero va la del logo, con el título y los botones, y después estas fotos en este
         orden; cambian solas cada pocos segundos y también se pueden pasar con el dedo. Hasta{' '}
-        {max} fotos, JPG, PNG, WebP o AVIF de hasta 8 MB. Lo ideal es que sean horizontales
-        (por ejemplo 1800 × 1100); si tienen otra forma se ven enteras, sin cortar, sobre la
-        misma foto desenfocada.
+        {max} fotos, JPG, PNG, WebP o AVIF de hasta 8 MB. En la compu ocupan el alto de la
+        portada y en el celular se ven cuadradas: una foto cuadrada (como un posteo de
+        Instagram) queda bien en los dos. Se ven siempre enteras, sin cortar; si tienen otra
+        forma, sobre la misma foto desenfocada.
       </p>
     </div>
   );

@@ -80,11 +80,13 @@ En **Ajustes → Portada → Banners** se suben hasta 8 fotos (se ordenan con la
 flechas y se quitan con la cruz). Sin banners, la portada queda fija como siempre; con
 alguno, pasa a ser un carrusel: primero la portada del logo, con el título y los
 botones, y después los banners. Pasa sola cada 6 segundos y se desliza con el dedo,
-las flechas (con mouse) o los puntos; se frena con el mouse encima, con el foco del
-teclado adentro, con el dedo apoyado y si la persona pidió menos movimiento. Todas las
-imágenes toman el alto de la portada del logo, y el banner se ve siempre entero (suelen
-traer texto) sobre la misma foto desenfocada. Se guardan a 2000 px de lado mayor, no a
-1200 como las de los productos, porque ocupan todo el ancho.
+las flechas o los puntos; se frena con el mouse encima, con el foco del teclado
+adentro, con el dedo apoyado, cuando casi no se ve y si la persona pidió menos
+movimiento. En la compu todas las imágenes toman el alto de la portada del logo y las
+flechas van a los costados; en el celular los banners son cuadrados, la tira toma el
+alto de la que se ve y las flechas van al lado de los puntos. El banner se ve siempre
+entero (suelen traer texto) sobre la misma foto desenfocada. Se guardan a 2000 px de
+lado mayor, no a 1200 como las de los productos, porque ocupan todo el ancho.
 
 ## Logo
 
