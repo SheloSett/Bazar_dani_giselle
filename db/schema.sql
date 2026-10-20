@@ -42,6 +42,14 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER;
 -- Foto propia del rubro en el catálogo; NULL = se usa la del primer producto
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS photo TEXT;
 
+-- Fotos del carrusel de la portada (se cargan en Ajustes). Sin ninguna, la portada
+-- queda fija; con alguna, pasan después de la portada con el logo.
+CREATE TABLE IF NOT EXISTS banners (
+  id       SERIAL PRIMARY KEY,
+  filename TEXT NOT NULL,
+  position INT  NOT NULL DEFAULT 0
+);
+
 -- Pedidos armados en el catálogo. Se guardan al tocar "Enviar pedido por WhatsApp"
 -- para que el mensaje lleve un link al detalle con fotos (/pedido/<token>).
 -- No guardan datos de quien pide.

@@ -13,6 +13,13 @@ const PERKS: { key: PerkKey; icon: string }[] = [
   { key: 'perk3', icon: 'WhatsApp' },
 ];
 
+// Redes del negocio: se muestran en la portada y en el pie
+const SOCIALS: { key: keyof TextSettings; label: string; placeholder: string }[] = [
+  { key: 'instagram_url', label: 'Instagram', placeholder: '@bazardeco o instagram.com/bazardeco' },
+  { key: 'tiktok_url', label: 'TikTok', placeholder: '@bazardeco o tiktok.com/@bazardeco' },
+  { key: 'facebook_url', label: 'Facebook', placeholder: 'facebook.com/bazardeco' },
+];
+
 export function SettingsForm({ initial }: { initial: Settings }) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
@@ -130,6 +137,29 @@ export function SettingsForm({ initial }: { initial: Settings }) {
                 maxLength={90}
               />
             </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="adm-card">
+        <h2 className="card-t">Redes</h2>
+        <p className="card-note" style={{ marginBottom: 14 }}>
+          Aparecen en la portada y en el pie del catálogo. Pegá el link del perfil (el que da
+          la app al tocar “Compartir perfil”) o escribí solo el usuario. La que quede vacía
+          no se muestra. El WhatsApp es el de los pedidos, de arriba.
+        </p>
+        {SOCIALS.map(({ key, label, placeholder }) => (
+          <div className="fld" key={key}>
+            <label htmlFor={key}>{label}</label>
+            <input
+              id={key}
+              value={form[key]}
+              onChange={set(key)}
+              maxLength={300}
+              placeholder={placeholder}
+              autoComplete="off"
+              spellCheck={false}
+            />
           </div>
         ))}
       </section>

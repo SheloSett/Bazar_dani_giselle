@@ -30,6 +30,8 @@ const MIME_BY_EXT: Record<string, string> = {
 export const MAX_PHOTO_BYTES = 8 * 1024 * 1024; // 8 MB (el archivo que llega, antes de procesar)
 export const PHOTO_MAX_PX = 1200; // lado mayor de la foto guardada
 export const THUMB_MAX_PX = 600; // lado mayor de la miniatura (grilla del catálogo)
+// Los banners ocupan todo el ancho de la portada: con 1200 se verían borrosos
+export const BANNER_MAX_PX = 2000;
 
 // Nombres que genera la app: uuid + extensión admitida. Nunca rutas.
 const SAFE_FILENAME = /^[\w-]+\.(jpg|png|webp|avif)$/;
@@ -80,26 +82,30 @@ export function detectImageExt(buf: Uint8Array): string | null {
 
 // Normaliza la foto: aplica la rotación EXIF, acota el lado mayor, pasa a WebP
 // y descarta los metadatos (incluida la ubicación GPS que traen las fotos de
-// celular). Devuelve también la miniatura para la grilla.
-export async function processPhoto(input: Buffer): Promise<{ full: Buffer; thumb: Buffer }> {
-  const make = (maxPx: number, quality: number) =>
+// celular). Devuelve también la miniatura para la grilla. maxPx: lado mayor de la
+// foto grande (los banners van con BANNER_MAX_PX).
+export async function processPhoto(
+  input: Buffer,
+  maxPx = PHOTO_MAX_PX
+): Promise<{ full: Buffer; thumb: Buffer }> {
+  const make = (px: number, quality: number) =>
     sharp(input)
       .rotate()
-      .resize(maxPx, maxPx, { fit: 'inside', withoutEnlargement: true })
+      .resize(px, px, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality })
       .toBuffer();
-  const [full, thumb] = await Promise.all([make(PHOTO_MAX_PX, 82), make(THUMB_MAX_PX, 78)]);
+  const [full, thumb] = await Promise.all([make(maxPx, 82), make(THUMB_MAX_PX, 78)]);
   return { full, thumb };
 }
 
-export async function savePhoto(file: File): Promise<string> {
+export async function savePhoto(file: File, maxPx = PHOTO_MAX_PX): Promise<string> {
   if (file.size > MAX_PHOTO_BYTES) throw new Error('La foto supera los 8 MB');
   const buf = Buffer.from(await file.arrayBuffer());
   if (!detectImageExt(buf)) throw new Error('Formato no admitido (usar JPG, PNG, WebP o AVIF)');
 
   let processed: { full: Buffer; thumb: Buffer };
   try {
-    processed = await processPhoto(buf);
+    processed = await processPhoto(buf, maxPx);
   } catch {
     throw new Error('No se pudo procesar la imagen (¿archivo dañado?)');
   }

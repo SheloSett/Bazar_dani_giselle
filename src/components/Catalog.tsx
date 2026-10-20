@@ -87,11 +87,13 @@ export function Catalog({
   products,
   categories,
   categoryPhotos = {},
+  banners = [],
   settings,
 }: {
   products: PublicProduct[];
   categories: string[];
   categoryPhotos?: Record<string, string>; // nombre de categoría -> foto propia del rubro
+  banners?: string[]; // fotos del carrusel de la portada, en orden
   settings: Settings;
 }) {
   const [cart, setCart] = useState<Cart>({});
@@ -423,6 +425,7 @@ export function Catalog({
         settings={settings}
         stats={stats}
         photos={heroPhotos}
+        banners={banners}
         waHref={waGeneral}
         onBrowse={browse}
       />

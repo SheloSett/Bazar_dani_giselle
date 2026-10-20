@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { Settings } from '@/lib/data';
 import { IconInstagram, IconWhatsApp } from '@/components/icons';
+import { hasSocials, SocialLinks } from '@/components/SocialLinks';
 
 // Créditos del desarrollador en el pie, como en los otros sitios (Shiraf,
 // IGWT Store, Manhattan). El mail va en minúscula; Gmail ignora las mayúsculas.
@@ -32,6 +33,10 @@ export function SiteFooter({
         <div className="foot-brand">
           <span className="brand">{settings.shop_name}</span>
           {settings.tagline && <p>{settings.tagline}</p>}
+          {/* las redes del negocio, con el WhatsApp de los pedidos al final */}
+          {hasSocials(settings) && (
+            <SocialLinks settings={settings} waHref={waHref} className="social-row" />
+          )}
         </div>
         {categories.length > 0 && (
           <nav className="foot-col" aria-label="Rubros">

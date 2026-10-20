@@ -12,6 +12,7 @@ import {
   parseOrderItems,
   parsePhone,
   parsePrice,
+  parseSocial,
   parseStock,
   sameIdSet,
   sameOrderItems,
@@ -263,5 +264,73 @@ describe('pedidos repetidos', () => {
       sameOrderItems([{ id: 1, quantity: 1 }], [{ id: 1, quantity: 1 }, { id: 2, quantity: 1 }]),
       false
     );
+  });
+});
+
+describe('parseSocial', () => {
+  test('vacío: la red no se muestra', () => {
+    assert.equal(parseSocial('instagram', ''), '');
+    assert.equal(parseSocial('tiktok', '   '), '');
+  });
+
+  test('Instagram: usuario con o sin @, o el link del perfil como venga', () => {
+    const ig = 'https://www.instagram.com/bazar.deco/';
+    for (const v of [
+      'bazar.deco',
+      '@bazar.deco',
+      'instagram.com/bazar.deco',
+      'https://www.instagram.com/bazar.deco/',
+      'https://instagram.com/bazar.deco?igsh=MWx0eGh1a2V5',
+      'http://m.instagram.com/bazar.deco/reels/',
+    ]) {
+      assert.equal(parseSocial('instagram', v), ig, v);
+    }
+  });
+
+  test('Instagram: una publicación, otro sitio o un usuario imposible no sirven', () => {
+    for (const v of [
+      'https://www.instagram.com/p/C1a2b3c4/',
+      'https://www.instagram.com/',
+      'https://linktr.ee/bazardeco',
+      'javascript:alert(1)',
+      'bazar deco',
+      'a'.repeat(31),
+    ]) {
+      assert.equal(parseSocial('instagram', v), null, v);
+    }
+  });
+
+  test('TikTok: el usuario va con @ en el link', () => {
+    const tt = 'https://www.tiktok.com/@bazardeco';
+    for (const v of [
+      'bazardeco',
+      '@bazardeco',
+      'tiktok.com/@bazardeco',
+      'https://www.tiktok.com/@bazardeco?lang=es',
+      'https://www.tiktok.com/@bazardeco/video/7300000000000000000',
+    ]) {
+      assert.equal(parseSocial('tiktok', v), tt, v);
+    }
+    assert.equal(parseSocial('tiktok', 'https://www.tiktok.com/bazardeco'), null);
+    assert.equal(parseSocial('tiktok', 'https://vm.tiktok.com/ZMabc123/'), null);
+  });
+
+  test('Facebook: usuario, página o perfil con número', () => {
+    assert.equal(parseSocial('facebook', 'bazardeco'), 'https://www.facebook.com/bazardeco');
+    assert.equal(
+      parseSocial('facebook', 'https://web.facebook.com/bazardeco/?ref=page_internal'),
+      'https://www.facebook.com/bazardeco'
+    );
+    assert.equal(
+      parseSocial('facebook', 'fb.com/p/Bazar-Deco-100089123456789/'),
+      'https://www.facebook.com/p/Bazar-Deco-100089123456789'
+    );
+    assert.equal(
+      parseSocial('facebook', 'https://www.facebook.com/profile.php?id=100089123456789&mibextid=ZbWKwL'),
+      'https://www.facebook.com/profile.php?id=100089123456789'
+    );
+    assert.equal(parseSocial('facebook', 'https://www.facebook.com/profile.php'), null);
+    assert.equal(parseSocial('facebook', 'https://www.facebook.com/'), null);
+    assert.equal(parseSocial('facebook', 'https://evil.com/facebook.com/bazardeco'), null);
   });
 });

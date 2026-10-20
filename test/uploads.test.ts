@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import {
+  BANNER_MAX_PX,
   detectImageExt,
   isSafeFilename,
   logoNeedsName,
@@ -52,6 +53,13 @@ describe('procesado de fotos', () => {
     assert.deepEqual([f.width, f.height], [1200, 600]);
     assert.equal(t.format, 'webp');
     assert.deepEqual([t.width, t.height], [600, 300]);
+  });
+
+  test('un banner se guarda más grande (la miniatura no cambia)', async () => {
+    const { full, thumb } = await processPhoto(await image(3000, 1000, 'png'), BANNER_MAX_PX);
+    const f = await sharp(full).metadata();
+    assert.deepEqual([f.width, f.height], [BANNER_MAX_PX, 667]);
+    assert.equal((await sharp(thumb).metadata()).width, 600);
   });
 
   test('no agranda fotos chicas', async () => {

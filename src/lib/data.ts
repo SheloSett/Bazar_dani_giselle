@@ -37,6 +37,9 @@ export interface AdminPhoto {
   position: number;
 }
 
+// Foto del carrusel de la portada (misma forma que la de un producto)
+export type Banner = AdminPhoto;
+
 // Ajustes de texto: los que se editan en el formulario del panel
 export interface TextSettings {
   shop_name: string;
@@ -50,6 +53,10 @@ export interface TextSettings {
   perk2_text: string;
   perk3_title: string;
   perk3_text: string;
+  // Redes del negocio: el link al perfil, ya armado (ver parseSocial). Vacío = no se muestra.
+  instagram_url: string;
+  tiktok_url: string;
+  facebook_url: string;
 }
 
 export interface Settings extends TextSettings {
@@ -71,6 +78,9 @@ export const SETTING_KEYS: (keyof TextSettings)[] = [
   'perk2_text',
   'perk3_title',
   'perk3_text',
+  'instagram_url',
+  'tiktok_url',
+  'facebook_url',
 ];
 
 const LOGO_KEY = 'logo';
@@ -89,6 +99,9 @@ const SETTINGS_DEFAULTS: Settings = {
   perk2_text: 'Pasá a buscar tu pedido',
   perk3_title: 'Pedido por WhatsApp',
   perk3_text: 'Armás la lista y la enviás en un toque',
+  instagram_url: '',
+  tiktok_url: '',
+  facebook_url: '',
   logo: null,
   logo_with_name: false,
 };
@@ -144,6 +157,50 @@ export async function updateSettings(entries: Partial<Settings>): Promise<void> 
       );
     }
   }
+}
+
+// ---------- banners de la portada ----------
+
+// Tope de fotos del carrusel: con más, nadie llega a verlas pasar
+export const MAX_BANNERS = 8;
+
+export async function listBanners(): Promise<Banner[]> {
+  return query<Banner>('SELECT id, filename, position FROM banners ORDER BY position, id');
+}
+
+// Agrega la foto al final del carrusel, o devuelve null si ya está lleno
+export async function addBanner(filename: string): Promise<Banner | null> {
+  const rows = await query<Banner>(
+    `INSERT INTO banners (filename, position)
+     SELECT $1, COALESCE((SELECT MAX(position) + 1 FROM banners), 1)
+     WHERE (SELECT COUNT(*) FROM banners) < $2
+     RETURNING id, filename, position`,
+    [filename, MAX_BANNERS]
+  );
+  return rows[0] ?? null;
+}
+
+// Nuevo orden del carrusel. Devuelve false si los ids no son exactamente los banners.
+export async function reorderBanners(ids: number[]): Promise<boolean> {
+  const current = await listBanners();
+  if (!sameIdSet(current.map((b) => b.id), ids)) return false;
+  // Una sola sentencia: o cambia todo el orden o no cambia nada
+  await query(
+    `UPDATE banners b SET position = v.pos
+     FROM unnest($1::int[], $2::int[]) AS v(id, pos)
+     WHERE b.id = v.id`,
+    [ids, ids.map((_, i) => i + 1)]
+  );
+  return true;
+}
+
+// Devuelve el archivo que tenía (para borrarlo), o null si no existía
+export async function deleteBanner(id: number): Promise<string | null> {
+  const rows = await query<{ filename: string }>(
+    'DELETE FROM banners WHERE id = $1 RETURNING filename',
+    [id]
+  );
+  return rows[0]?.filename ?? null;
 }
 
 // ---------- categorías ----------

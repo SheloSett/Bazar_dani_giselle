@@ -64,6 +64,24 @@ y se guarda solo con dígitos), el título y el texto de la portada, y los tres
 **beneficios** de la franja con íconos ("Envío en el día", etc.): cada uno tiene
 título y aclaración, y el que queda sin título no se muestra.
 
+**Redes**: Instagram, TikTok y Facebook. Se puede pegar el link del perfil (con lo que
+agregue la app al compartir, como `?igsh=`) o escribir solo el usuario, con o sin @;
+se valida y se guarda el link al perfil ya armado (`parseSocial`). Aparecen como
+botones redondos en la portada ("Seguinos") y en el pie, donde va también el WhatsApp
+de los pedidos. La que queda vacía no se muestra.
+
+## Banners de la portada
+
+En **Ajustes → Banners de la portada** se suben hasta 8 fotos (se ordenan con las
+flechas y se quitan con la cruz). Sin banners, la portada queda fija como siempre; con
+alguno, pasa a ser un carrusel: primero la portada del logo, con el título y los
+botones, y después los banners. Pasa sola cada 6 segundos y se desliza con el dedo,
+las flechas (con mouse) o los puntos; se frena con el mouse encima, con el foco del
+teclado adentro, con el dedo apoyado y si la persona pidió menos movimiento. Todas las
+imágenes toman el alto de la portada del logo, y el banner se ve siempre entero (suelen
+traer texto) sobre la misma foto desenfocada. Se guardan a 2000 px de lado mayor, no a
+1200 como las de los productos, porque ocupan todo el ancho.
+
 ## Logo
 
 En **Ajustes → Logo** se sube la imagen del negocio (JPG, PNG, WebP o AVIF; lo ideal

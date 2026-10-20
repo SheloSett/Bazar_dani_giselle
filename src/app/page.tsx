@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cache } from 'react';
-import { getSettings, listCategories, listPublicProducts } from '@/lib/data';
+import { getSettings, listBanners, listCategories, listPublicProducts } from '@/lib/data';
 import { ogImagePath } from '@/lib/catalog';
 import { siteBaseUrl } from '@/lib/site';
 import { Catalog } from '@/components/Catalog';
@@ -48,7 +48,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const { products, categories, settings } = await loadCatalog();
+  const [{ products, categories, settings }, banners] = await Promise.all([
+    loadCatalog(),
+    listBanners(),
+  ]);
 
   // Al navegador van solo los rubros que tienen algo para mostrar: los vacíos o con
   // todos sus productos ocultos no tienen por qué figurar en el código de la página
@@ -62,6 +65,7 @@ export default async function HomePage() {
       categoryPhotos={Object.fromEntries(
         shown.flatMap((c) => (c.photo ? [[c.name, c.photo]] : []))
       )}
+      banners={banners.map((b) => b.filename)}
       settings={settings}
     />
   );

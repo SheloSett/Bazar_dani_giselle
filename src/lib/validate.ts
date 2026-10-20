@@ -108,6 +108,75 @@ export function parsePhone(value: unknown): string | null {
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
 }
 
+// ---------- redes del negocio (Ajustes) ----------
+
+export type SocialNetwork = 'instagram' | 'tiktok' | 'facebook';
+
+const SOCIAL_HOSTS: Record<SocialNetwork, RegExp> = {
+  instagram: /^(?:(?:www|m)\.)?(?:instagram\.com|instagr\.am)$/,
+  tiktok: /^(?:(?:www|m)\.)?tiktok\.com$/,
+  facebook: /^(?:(?:www|m|web)\.)?(?:facebook|fb)\.com$/,
+};
+
+const IG_USER = /^[A-Za-z0-9._]{1,30}$/;
+const TT_USER = /^[A-Za-z0-9._]{2,24}$/;
+const FB_USER = /^[A-Za-z0-9.-]{2,80}$/;
+// Cada parte de la ruta de un link de Facebook (/p/Bazar-Deco-1000…, /share/…)
+const FB_PART = /^[A-Za-z0-9._-]{1,80}$/;
+// Rutas de Instagram que no son un perfil (una publicación, un reel…)
+const IG_NOT_PROFILE = new Set(['p', 'reel', 'reels', 'stories', 'explore', 'tv', 'accounts']);
+
+// Link al perfil de una red, armado con lo que se pegue en Ajustes: el link del perfil
+// (con o sin https, www o lo que agrega la app al compartir, como ?igsh=) o solo el
+// usuario, con o sin @. Devuelve '' si quedó vacío (esa red no se muestra) o null si no
+// es un perfil de esa red. El link sale siempre armado acá, nunca tal cual llegó.
+export function parseSocial(network: SocialNetwork, value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 300) return null;
+  const v = value.trim();
+  if (!v) return '';
+
+  const link = /^(?:https?:\/\/)?([^/?#\s]+)([^?#\s]*)(?:\?([^#\s]*))?(?:#\S*)?$/i.exec(v);
+  if (link && SOCIAL_HOSTS[network].test(link[1].toLowerCase())) {
+    const parts = link[2].split('/').filter(Boolean);
+    return socialFromLink(network, parts, new URLSearchParams(link[3] ?? ''));
+  }
+  // Un link de otro sitio (o cualquier cosa con barras) no es un usuario
+  if (/[/:\s]/.test(v)) return null;
+  return socialFromUser(network, v.replace(/^@/, ''));
+}
+
+function socialFromUser(network: SocialNetwork, user: string): string | null {
+  if (network === 'instagram')
+    return IG_USER.test(user) ? `https://www.instagram.com/${user}/` : null;
+  if (network === 'tiktok') return TT_USER.test(user) ? `https://www.tiktok.com/@${user}` : null;
+  return FB_USER.test(user) ? `https://www.facebook.com/${user}` : null;
+}
+
+function socialFromLink(
+  network: SocialNetwork,
+  parts: string[],
+  query: URLSearchParams
+): string | null {
+  const [first = ''] = parts;
+  // Instagram y TikTok: el perfil es lo primero de la ruta (lo que siga, como un
+  // video del perfil, se descarta). En TikTok el usuario va con @.
+  if (network === 'instagram')
+    return IG_NOT_PROFILE.has(first.toLowerCase()) ? null : socialFromUser(network, first);
+  if (network === 'tiktok')
+    return first.startsWith('@') ? socialFromUser(network, first.slice(1)) : null;
+
+  // Facebook: perfil sin nombre de usuario (profile.php?id=…) o una ruta corta, como
+  // /bazardeco, /p/Bazar-Deco-1000… o /share/…
+  if (first.toLowerCase() === 'profile.php') {
+    const id = query.get('id') ?? '';
+    return parts.length === 1 && /^\d{5,20}$/.test(id)
+      ? `https://www.facebook.com/profile.php?id=${id}`
+      : null;
+  }
+  if (!parts.length || parts.length > 3 || !parts.every((p) => FB_PART.test(p))) return null;
+  return `https://www.facebook.com/${parts.join('/')}`;
+}
+
 // Por qué no sirve el teléfono de un pedido: le faltan números (o el código de área),
 // o se nota inventado
 export type PhoneError = 'incompleto' | 'inventado';

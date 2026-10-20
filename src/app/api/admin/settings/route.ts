@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { denyAdminWrite, isAdmin } from '@/lib/session';
 import { getSettings, updateSettings, SETTING_KEYS, type TextSettings } from '@/lib/data';
-import { parsePhone } from '@/lib/validate';
+import { parsePhone, parseSocial, type SocialNetwork } from '@/lib/validate';
 
-// Largo máximo de cada texto: son los que entran bien donde se muestran
+// Las redes se guardan como link al perfil, armado con lo que se haya pegado
+const SOCIALS: { key: keyof TextSettings; network: SocialNetwork; label: string }[] = [
+  { key: 'instagram_url', network: 'instagram', label: 'Instagram' },
+  { key: 'tiktok_url', network: 'tiktok', label: 'TikTok' },
+  { key: 'facebook_url', network: 'facebook', label: 'Facebook' },
+];
+
+// Largo máximo de cada texto: son los que entran bien donde se muestran (las redes,
+// lo que se pega: un link de compartir puede venir largo)
 const MAX_LENGTH: Record<keyof TextSettings, number> = {
   shop_name: 80,
   whatsapp_phone: 40,
@@ -15,6 +23,9 @@ const MAX_LENGTH: Record<keyof TextSettings, number> = {
   perk2_text: 90,
   perk3_title: 40,
   perk3_text: 90,
+  instagram_url: 300,
+  tiktok_url: 300,
+  facebook_url: 300,
 };
 
 export async function GET() {
@@ -52,6 +63,16 @@ export async function PATCH(req: NextRequest) {
         'El WhatsApp no es válido. Tiene que ir con código de país, por ejemplo 5491122334455.'
       );
     entries.whatsapp_phone = digits;
+  }
+
+  for (const { key, network, label } of SOCIALS) {
+    if (entries[key] === undefined) continue;
+    const url = parseSocial(network, entries[key]);
+    if (url === null)
+      return fail(
+        `El ${label} no es válido. Pegá el link del perfil o escribí el usuario, por ejemplo @bazardeco.`
+      );
+    entries[key] = url;
   }
 
   await updateSettings(entries);
