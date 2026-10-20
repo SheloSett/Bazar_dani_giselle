@@ -996,6 +996,18 @@ img { max-width: 100%; }
 .settings, .settings-form { display: grid; gap: 18px; }
 .settings { max-width: 760px; }
 .settings > h1 { margin: 0; }
+/* pestañas de Ajustes (las mismas píldoras que los rubros del catálogo) */
+.adm-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.adm-tabs::-webkit-scrollbar { display: none; }
+.adm-tabs a {
+  flex: 0 0 auto; font-size: 0.9rem; font-weight: 600; color: #5c5e60; text-decoration: none;
+  padding: 8px 18px; white-space: nowrap; border-radius: 999px;
+  border: 1px solid #cdd3d8; background: #fff;
+}
+.adm-tabs a[aria-current="page"] {
+  background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent);
+}
+@media (hover: hover) { .adm-tabs a:not([aria-current]):hover { border-color: #9aa3aa; color: var(--ink); } }
 .settings-save .msg-ok, .settings-save .msg-err { margin-bottom: 12px; }
 /* barra de acciones siempre visible al pie */
 .pform-bar {

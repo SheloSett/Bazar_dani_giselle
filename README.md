@@ -59,7 +59,11 @@ igual al final de su rubro.
 
 ## Ajustes del negocio
 
-En **Ajustes** se cambian el nombre, el WhatsApp donde llegan los pedidos (se valida
+**Ajustes** está en pestañas (`/admin/settings?tab=…`): **Negocio** (logo, nombre y
+WhatsApp), **Portada** (banners, título, texto y beneficios), **Redes** y **Sistema**
+(clave del panel y dónde se guardan las fotos). Cada pestaña guarda solo sus campos.
+
+Se cambian el nombre, el WhatsApp donde llegan los pedidos (se valida
 y se guarda solo con dígitos), el título y el texto de la portada, y los tres
 **beneficios** de la franja con íconos ("Envío en el día", etc.): cada uno tiene
 título y aclaración, y el que queda sin título no se muestra.
@@ -72,7 +76,7 @@ de los pedidos. La que queda vacía no se muestra.
 
 ## Banners de la portada
 
-En **Ajustes → Banners de la portada** se suben hasta 8 fotos (se ordenan con las
+En **Ajustes → Portada → Banners** se suben hasta 8 fotos (se ordenan con las
 flechas y se quitan con la cruz). Sin banners, la portada queda fija como siempre; con
 alguno, pasa a ser un carrusel: primero la portada del logo, con el título y los
 botones, y después los banners. Pasa sola cada 6 segundos y se desliza con el dedo,
@@ -84,7 +88,7 @@ traer texto) sobre la misma foto desenfocada. Se guardan a 2000 px de lado mayor
 
 ## Logo
 
-En **Ajustes → Logo** se sube la imagen del negocio (JPG, PNG, WebP o AVIF; lo ideal
+En **Ajustes → Negocio → Logo** se sube la imagen del negocio (JPG, PNG, WebP o AVIF; lo ideal
 es un PNG con fondo transparente). Un logo apaisado (más ancho que alto) reemplaza al
 nombre en el encabezado del catálogo, de los pedidos y de las páginas legales; uno
 cuadrado o redondo va con el nombre al lado, porque a ese tamaño no se lee (se decide
@@ -181,7 +185,7 @@ Antes de subir cambios: `npm run lint && npm test`.
 ## Clave del panel
 
 Se entra a `/admin` con `ADMIN_PASSWORD` del `.env` solo la primera vez. Desde
-**Ajustes → Clave del panel** se cambia sin tocar el servidor: queda guardada
+**Ajustes → Sistema → Clave del panel** se cambia sin tocar el servidor: queda guardada
 hasheada en la base y la del `.env` deja de valer. Cambiarla cierra las sesiones
 abiertas en otros dispositivos.
 
@@ -268,7 +272,7 @@ fotos), alcanza con una variable:
 
    Opcional: `CLOUDINARY_FOLDER=bazar` cambia la carpeta dentro de la cuenta.
 3. `docker compose up -d` para que la app la tome. Desde ese momento las fotos nuevas
-   van a Cloudinary; en Ajustes del panel se ve dónde se están guardando.
+   van a Cloudinary; en Ajustes → Sistema se ve dónde se están guardando.
 4. Pasar las fotos que ya estaban en el disco, una sola vez:
 
    ```bash
