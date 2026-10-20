@@ -171,7 +171,8 @@ export function SettingsForm({
         <section className="adm-card">
           <h2 className="card-t">Redes</h2>
           <p className="card-note" style={{ marginBottom: 14 }}>
-            Aparecen en la portada y en el pie del catálogo. Pegá el link del perfil (el que da
+            Aparecen en la portada, en tarjetas al final del catálogo y en el pie. Pegá el link
+            del perfil (el que da
             la app al tocar “Compartir perfil”) o escribí solo el usuario. La que quede vacía
             no se muestra. El WhatsApp es el de los pedidos, de la pestaña Negocio.
           </p>

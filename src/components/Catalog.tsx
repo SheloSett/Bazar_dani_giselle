@@ -21,6 +21,7 @@ import { Gallery } from '@/components/Gallery';
 import { Hero, Perks } from '@/components/Hero';
 import { CategoryTiles } from '@/components/CategoryTiles';
 import { SiteFooter, WhatsAppFab } from '@/components/SiteFooter';
+import { SocialCards } from '@/components/SocialLinks';
 import {
   IconBasket,
   IconClose,
@@ -477,6 +478,8 @@ export function Catalog({
           ))}
         </div>
       </main>
+
+      <SocialCards settings={settings} waHref={waGeneral} />
 
       <SiteFooter
         settings={settings}

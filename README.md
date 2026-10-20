@@ -71,8 +71,9 @@ título y aclaración, y el que queda sin título no se muestra.
 **Redes**: Instagram, TikTok y Facebook. Se puede pegar el link del perfil (con lo que
 agregue la app al compartir, como `?igsh=`) o escribir solo el usuario, con o sin @;
 se valida y se guarda el link al perfil ya armado (`parseSocial`). Aparecen como
-botones redondos en la portada ("Seguinos") y en el pie, donde va también el WhatsApp
-de los pedidos. La que queda vacía no se muestra.
+botones redondos en la portada ("Seguinos") y en el pie, y como tarjetas grandes con el
+color de cada red (con el @usuario, `socialHandle`) entre los productos y el pie; en
+estas dos últimas va también el WhatsApp de los pedidos. La que queda vacía no se muestra.
 
 ## Banners de la portada
 

@@ -14,6 +14,7 @@ import {
   parsePrice,
   parseSocial,
   parseStock,
+  socialHandle,
   sameIdSet,
   sameOrderItems,
 } from '@/lib/validate';
@@ -332,5 +333,33 @@ describe('parseSocial', () => {
     assert.equal(parseSocial('facebook', 'https://www.facebook.com/profile.php'), null);
     assert.equal(parseSocial('facebook', 'https://www.facebook.com/'), null);
     assert.equal(parseSocial('facebook', 'https://evil.com/facebook.com/bazardeco'), null);
+  });
+});
+
+describe('socialHandle', () => {
+  test('el usuario que se muestra, sacado del link guardado', () => {
+    assert.equal(socialHandle('instagram', 'https://www.instagram.com/bazar.deco/'), '@bazar.deco');
+    assert.equal(socialHandle('tiktok', 'https://www.tiktok.com/@bazardeco'), '@bazardeco');
+    assert.equal(socialHandle('facebook', 'https://www.facebook.com/bazardeco'), 'bazardeco');
+    assert.equal(
+      socialHandle('facebook', 'https://www.facebook.com/p/Bazar-Deco-100089123456789'),
+      'Bazar Deco'
+    );
+  });
+
+  test('sin nada legible no muestra nada', () => {
+    assert.equal(socialHandle('facebook', 'https://www.facebook.com/profile.php?id=100089123456789'), null);
+    assert.equal(socialHandle('facebook', 'https://www.facebook.com/share/1AbC2dE3'), null);
+    assert.equal(socialHandle('instagram', ''), null);
+  });
+
+  test('siempre coincide con lo que guarda parseSocial', () => {
+    for (const [network, input, handle] of [
+      ['instagram', '@bazar.deco', '@bazar.deco'],
+      ['tiktok', 'tiktok.com/@bazardeco?lang=es', '@bazardeco'],
+      ['facebook', 'web.facebook.com/bazardeco/?ref=page_internal', 'bazardeco'],
+    ] as const) {
+      assert.equal(socialHandle(network, parseSocial(network, input)!), handle, input);
+    }
   });
 });

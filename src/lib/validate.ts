@@ -177,6 +177,21 @@ function socialFromLink(
   return `https://www.facebook.com/${parts.join('/')}`;
 }
 
+// Cómo se muestra el perfil (tarjetas de redes del catálogo), sacado del link que arma
+// parseSocial: @usuario en Instagram y TikTok, el nombre de la página en Facebook. null
+// si el link no tiene nada legible (un perfil de Facebook con número, un /share/…).
+export function socialHandle(network: SocialNetwork, url: string): string | null {
+  const path = /^https:\/\/www\.[a-z]+\.com\/([^?#]*)/.exec(url)?.[1];
+  if (!path) return null;
+  const parts = path.split('/').filter(Boolean);
+  if (network === 'instagram') return parts.length === 1 ? `@${parts[0]}` : null;
+  if (network === 'tiktok') return parts.length === 1 && parts[0].startsWith('@') ? parts[0] : null;
+  // /bazardeco, o /p/Bazar-Deco-100089… (el nombre con guiones y el número al final)
+  const page = parts.length === 1 ? parts[0] : parts.length === 2 && parts[0] === 'p' ? parts[1] : '';
+  const name = page.replace(/-\d{6,}$/, '').replace(/-/g, ' ');
+  return name && name !== 'profile.php' ? name : null;
+}
+
 // Por qué no sirve el teléfono de un pedido: le faltan números (o el código de área),
 // o se nota inventado
 export type PhoneError = 'incompleto' | 'inventado';
